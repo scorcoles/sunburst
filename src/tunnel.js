@@ -22,6 +22,8 @@ import * as THREE from 'three';
 // segundo (en anillos).
 const RINGS = 26;
 const FLOW = 0.35;
+// Lo fino que es el grano de las motas blancas (más = motas más pequeñas).
+const GRAIN = 150;
 // La perspectiva del embudo: cuánto se va el centro del borde de fuera al lado contrario
 // del agujero (en proporción a lo que se aleja el agujero del centro) y cuánto sube (en
 // partes de medio recuadro).
@@ -95,7 +97,8 @@ export function createTunnel({ paper, ink }) {
         // ha llegado a agarrar. El blanco queda limpio. (Y fuera del agujero: dentro, negro
         // limpio.)
         vec2 uv = vWorld;
-        float specks = step(0.88, noise(uv * 70.0 + 11.0)) * step(0.66, noise(uv * 3.5 + 7.0));
+        // (GRAIN: lo fino que es el grano; más = motas más pequeñas.)
+        float specks = step(0.88, noise(uv * ${GRAIN.toFixed(1)} + 11.0)) * step(0.66, noise(uv * 3.5 + 7.0));
         float outside = step(0.0, C);
         black = mix(black, 0.0, specks * black * outside);
         vec3 color = mix(paper, ink, black);
