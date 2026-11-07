@@ -27,7 +27,7 @@ import { HOLE } from './rays.js';
 const OUTER = 5;
 const RINGS = 80;
 const DEPTH = 0.9;
-const FALL = 0.012;
+const FALL = 0.04;
 // La garganta: qué parte de los anillos está en ella (los de más abajo), lo estrecha que
 // llega a ser (en partes del agujero) y lo que baja.
 const THROAT = 0.14;
