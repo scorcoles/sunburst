@@ -38,7 +38,7 @@ const SPACING = 0.03;
 // El tamaño de cada punto (píxeles, a la distancia del plano) y cuánto se desvían de su
 // anillo (en partes de su radio): un punteado, no una máquina.
 const SIZE = 2.6;
-const JITTER = 0.005;
+const JITTER = 0.002;
 // Qué parte del giro de los otros modos gira aquí (poco: lo que manda es la caída).
 const SPIN_SHARE = 0.15;
 // Lo inclinado que está, para verlo en ángulo (radianes; el de arriba, más lejos).
@@ -70,15 +70,19 @@ export function createDots({ ink }) {
   // Los anillos, en partes iguales del camino; el radio de cada uno lo pone el shader.
   for (let k = 0; k < RINGS; k++) {
     const u = k / RINGS;
-    // Cuántos puntos: los que caben en el anillo más grande que llega a ser (fuera de la
-    // garganta, crece; lo hacemos para su tamaño de fuera).
-    const r = HOLE * (OUTER / HOLE) ** Math.max(0, (u - THROAT) / (1 - THROAT));
-    const count = Math.max(24, Math.round((Math.PI * 2 * Math.max(r, HOLE)) / SPACING));
+    // Cuántos puntos: todos los anillos, los mismos, los que caben en el más grande (el
+    // de fuera). Cada anillo pasa por todos los tamaños al caer, así que no pueden ir con
+    // los de su tamaño de partida: los de fuera llegarían al centro con demasiados y los de
+    // dentro saldrían fuera con muy pocos. El shader enseña solo los que caben en el tamaño
+    // que tiene en cada momento.
+    const count = Math.round((Math.PI * 2 * OUTER) / SPACING);
     const start = Math.random() * Math.PI * 2;
     for (let i = 0; i < count; i++) {
       us.push(u);
       angles.push(start + (i / count) * Math.PI * 2);
-      seeds.push(Math.random());
+      // Su número dentro del anillo: cuando no caben todos, el shader enseña uno de cada
+      // tantos, siempre a la misma distancia (sin huecos ni montones).
+      seeds.push(i);
       jitters.push((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
     }
   }
@@ -157,8 +161,11 @@ export function createDots({ ink }) {
         gl_PointSize = ${SIZE.toFixed(1)} * pixelRatio * distance / -view.z;
         // Cuántos puntos se quedan: hacia fuera, cada vez menos (el punteado se deshace);
         // al fondo de la garganta, también (se pierde); y al nacer por fuera, poco a poco.
-        float keep = (1.0 - smoothstep(0.45, 1.0, uu) * 0.92) * (1.0 - smoothstep(0.9, 1.0, uu)) * smoothstep(0.0, ${THROAT.toFixed(2)}, uu);
-        vKeep = step(seed, keep);
+        // (Y solo los que caben en el anillo a su tamaño de ahora: r / OUTER de todos.)
+        float keep = (r / ${OUTER.toFixed(1)}) * (1.0 - smoothstep(0.45, 1.0, uu) * 0.92) * (1.0 - smoothstep(0.9, 1.0, uu)) * smoothstep(0.0, ${THROAT.toFixed(2)}, uu);
+        // Uno de cada tantos, a intervalos exactos: el punto i se ve si con él se pasa a la
+        // siguiente unidad al contar «keep» por punto (como se dibuja una línea en píxeles).
+        vKeep = step(0.5, floor((seed + 1.0) * keep) - floor(seed * keep));
       }
     `,
     fragmentShader: /* glsl */ `
