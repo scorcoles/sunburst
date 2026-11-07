@@ -13,10 +13,6 @@
 //     (main.js las lanza); y cada toque o clic lanza una onda grande, como una piedra en el
 //     agua. Varias ondas a la vez se cruzan.
 //
-// Cada anillo tiene su densidad: unos muy marcados, otros tenues. Así se puede seguir uno
-// con la vista mientras se encoge y el pozo se lo traga (si todos fueran iguales, uno
-// ocuparía el sitio del otro y parecería quieto).
-//
 // Todo lo mueve un shader. Cada punto sabe en qué anillo está («u», de 0 al fondo de la
 // garganta a 1 en el borde de fuera) y en qué ángulo; con el tiempo, u baja (cae) y, al
 // llegar al fondo, vuelve a empezar por fuera. De ahí salen su radio y su altura, y luego
@@ -70,8 +66,6 @@ export function createDots({ ink }) {
   const angles = [];
   const seeds = [];
   const jitters = [];
-  // La densidad del anillo de cada punto (de 0 a 1).
-  const weights = [];
 
   // Los anillos, en partes iguales del camino; el radio de cada uno lo pone el shader.
   for (let k = 0; k < RINGS; k++) {
@@ -81,11 +75,8 @@ export function createDots({ ink }) {
     const r = HOLE * (OUTER / HOLE) ** Math.max(0, (u - THROAT) / (1 - THROAT));
     const count = Math.max(24, Math.round((Math.PI * 2 * Math.max(r, HOLE)) / SPACING));
     const start = Math.random() * Math.PI * 2;
-    // Uno de cada pocos, muy marcado; el resto, entre tenue y normal.
-    const weight = Math.random() < 0.18 ? 1 : 0.25 + Math.random() * 0.4;
     for (let i = 0; i < count; i++) {
       us.push(u);
-      weights.push(weight);
       angles.push(start + (i / count) * Math.PI * 2);
       seeds.push(Math.random());
       jitters.push((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
@@ -99,7 +90,6 @@ export function createDots({ ink }) {
   geometry.setAttribute('angle', new THREE.Float32BufferAttribute(angles, 1));
   geometry.setAttribute('seed', new THREE.Float32BufferAttribute(seeds, 1));
   geometry.setAttribute('jitter', new THREE.Float32BufferAttribute(jitters, 2));
-  geometry.setAttribute('weight', new THREE.Float32BufferAttribute(weights, 1));
 
   const uniforms = {
     ink: { value: new THREE.Color(ink) },
@@ -119,7 +109,6 @@ export function createDots({ ink }) {
       attribute float angle;
       attribute float seed;
       attribute vec2 jitter;
-      attribute float weight;
       uniform float phase;
       uniform float pixelRatio;
       uniform float distance;
@@ -168,7 +157,7 @@ export function createDots({ ink }) {
         gl_PointSize = ${SIZE.toFixed(1)} * pixelRatio * distance / -view.z;
         // Cuántos puntos se quedan: hacia fuera, cada vez menos (el punteado se deshace);
         // al fondo de la garganta, también (se pierde); y al nacer por fuera, poco a poco.
-        float keep = weight * (1.0 - smoothstep(0.55, 1.0, uu)) * smoothstep(0.0, ${THROAT.toFixed(2)}, uu);
+        float keep = (1.0 - smoothstep(0.45, 1.0, uu) * 0.92) * (1.0 - smoothstep(0.9, 1.0, uu)) * smoothstep(0.0, ${THROAT.toFixed(2)}, uu);
         vKeep = step(seed, keep);
       }
     `,
