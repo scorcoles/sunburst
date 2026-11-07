@@ -7,11 +7,15 @@
 // rayos; abajo, el pie entre dos líneas.
 //
 //   rays.js  → las bandas, su metal (un shader) y el agujero
+//   tunnel.js → el modo túnel: anillos que caen hacia el agujero (otro shader)
 //   main.js  → el escenario, el giro, la luz, el doble toque y los modos (este archivo)
 //
-// Dos modos, con «Prev» y «Next» en el pie, las flechas del teclado o la dirección
-// (#plano): «pliegues», cada tramo del zigzag una faceta que destella por su cuenta; y
-// «plano», todas las bandas recortadas de una sola lámina de metal.
+// Cuatro modos, con «Prev» y «Next» en el pie, las flechas del teclado o la dirección
+// (#flat, #tunnel, #wire): «folds», cada tramo del zigzag una faceta que destella por su
+// cuenta; «flat», todas las bandas recortadas de una sola lámina de metal; «tunnel», sin
+// rayos: anillos blancos y negros que caen hacia el agujero, con el desgaste de una
+// impresión vieja; y «wire», siempre el último, para ver cómo está hecho: contornos, guías
+// y los números, en gris y negro.
 //
 // El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
 // en arrancar, no llega del todo y, si el cursor se va, vuelve a su sitio. Con el ratón
@@ -20,7 +24,8 @@
 // también mueve la luz.
 
 import * as THREE from 'three';
-import { createRays } from './rays.js';
+import { createRays, HOLE, INFO, WIRE_PAPER } from './rays.js';
+import { createTunnel } from './tunnel.js';
 import '../style.css';
 
 const BACKGROUND = '#0d0d0d';
@@ -89,8 +94,39 @@ new ResizeObserver(resize).observe(canvas);
 resize();
 
 // Los modos, en orden. El primero es el de siempre (sin # en la dirección).
-const MODES = ['pliegues', 'plano'];
+// «wire», siempre el último. (Los nombres de antes, en castellano, siguen valiendo.)
+const MODES = ['folds', 'flat', 'tunnel', 'wire'];
+const OLD_NAMES = { pliegues: 'folds', plano: 'flat', tunel: 'tunnel' };
 let mode = MODES[0];
+
+// El túnel: uno para siempre (no tiene nada al azar), escondido salvo en su modo.
+const tunnel = createTunnel({ paper: '#e9e6df', ink: '#111111' });
+scene.add(tunnel.object);
+
+// Lo que se ve en cada modo: el túnel, o los rayos con su metal.
+// En wire, además, el papel gris claro de fondo y la ficha con los números.
+const notes = document.querySelector('[data-notes]');
+function showMode() {
+  tunnel.object.visible = mode === 'tunnel';
+  sun.object.visible = mode !== 'tunnel';
+  sun.setLook(mode);
+  renderer.setClearColor(mode === 'wire' ? WIRE_PAPER : BACKGROUND);
+  if (notes) notes.hidden = mode !== 'wire';
+}
+
+// La ficha del modo wire: qué es esto y con qué números funciona.
+if (notes) {
+  const rows = [
+    'SUNBURST · WIRE',
+    `${INFO.count} BANDAS · FILL ${INFO.fill}`,
+    `ESPIRAL LOG. · TWIST ${INFO.twist}`,
+    `ZIGZAG ${INFO.zigs}/R · ZAG ${INFO.zag} RAD`,
+    `AGUJERO ${INFO.hole} · MUELLE + ROZAMIENTO`,
+    'SHADER: TORNEADO + FACETAS',
+    'VERTIK.NET',
+  ];
+  notes.innerHTML = rows.map((row) => `<div>${row}</div>`).join('');
+}
 
 // El sol: sus rayos y, al azar, dónde está su agujero.
 let sun = null;
@@ -107,8 +143,8 @@ function newSun() {
   offset = { x: random(), y: random() };
   // El sol nuevo aparece en su sitio, quieto, y en el modo que esté puesto.
   Object.assign(hole, { x: offset.x, y: offset.y, vx: 0, vy: 0 });
-  sun.setFolds(mode === 'pliegues');
   scene.add(sun.object);
+  showMode();
 }
 newSun();
 
@@ -154,8 +190,9 @@ canvas.addEventListener('pointerdown', (e) => {
 
 // Cambiar de modo: el metal, y la dirección (sin llenar el historial).
 function setMode(name) {
+  name = OLD_NAMES[name] ?? name;
   mode = MODES.includes(name) ? name : MODES[0];
-  sun.setFolds(mode === 'pliegues');
+  showMode();
   const hash = mode === MODES[0] ? '' : `#${mode}`;
   if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
 }
@@ -198,5 +235,6 @@ renderer.setAnimationLoop((now) => {
   holeSize = pressed ? Math.min(GROW_MAX, holeSize + GROW * dt) : holeSize + (1 - holeSize) * Math.min(1, dt / SHRINK);
   sun.setHoleSize(holeSize);
   sun.update(angle, light);
+  tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, HOLE * holeSize);
   renderer.render(scene, camera);
 });

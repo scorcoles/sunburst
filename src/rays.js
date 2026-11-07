@@ -17,10 +17,15 @@
 // del giro. Encima, un cepillado finísimo (rayitas a lo largo de la banda) y un punto
 // irisado en los brillos.
 //
-// Eso es el modo «pliegues». En el modo «plano», sin facetas ni torneado: todas las bandas
+// Eso es el modo «folds». En el modo «flat», sin facetas ni torneado: todas las bandas
 // están recortadas de UNA lámina de metal plana. La luz es un degradado que cruza la
 // pantalla en línea recta, con su arcoíris, y la lámina gira por debajo: las bandas entran
 // y salen del brillo todas a la vez, como un solo plano.
+//
+// Y el modo «wire», para ver cómo está hecho (como el de vertikis: gris y negro, sobre
+// papel gris claro): las bandas, solo con su contorno; y fijas, en discontinua, las guías:
+// el radio 1 (donde la espiral deja de torcerse), los anillos donde se quiebra el zigzag,
+// el borde del agujero y una cruz en su centro.
 
 import * as THREE from 'three';
 
@@ -35,6 +40,10 @@ const RADIUS = 1;
 // Cuántas bandas, y qué parte de su hueco ocupa cada una (el resto, negro entre medias).
 const COUNT = 28;
 const FILL = 0.55;
+// Los colores del modo wire: el papel y la línea.
+export const WIRE_PAPER = '#eeeeee';
+const WIRE_LINE = '#333333';
+
 // Cuánto se tuercen en espiral (0 = rectas).
 const TWIST = 0.48;
 // El zigzag: cuántos quiebros por cada radio de largo, y cuánto se desvía (radianes).
@@ -59,6 +68,21 @@ function zigzag(u) {
   return x < 1 ? x : 2 - x;
 }
 
+// Los números, para la ficha del modo wire (main.js).
+export const INFO = { count: COUNT, fill: FILL, twist: TWIST, zigs: ZIGS, zag: ZAG, hole: HOLE };
+
+// Una línea discontinua: un círculo de radio r, o una lista de puntos.
+const dashed = new THREE.LineDashedMaterial({ color: WIRE_LINE, dashSize: 0.025, gapSize: 0.025 });
+function circle(r, material, segments = 128) {
+  const points = Array.from({ length: segments }, (_, k) => {
+    const a = (k / segments) * TAU;
+    return new THREE.Vector3(r * Math.cos(a), r * Math.sin(a), 0.02);
+  });
+  const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(points), material);
+  line.computeLineDistances();
+  return line;
+}
+
 export function createRays({ background }) {
   const slot = TAU / COUNT;
   const half = (slot * FILL) / 2;
@@ -67,6 +91,8 @@ export function createRays({ background }) {
   // distinta en cada tramo del zigzag.
   const facets = [];
   const index = [];
+  // El contorno de cada banda, para el modo wire: sus dos bordes, tramo a tramo.
+  const edges = [];
 
   for (let k = 0; k < COUNT; k++) {
     const base = k * slot;
@@ -89,6 +115,7 @@ export function createRays({ background }) {
       if (s > 0) {
         const p = first + (s - 1) * 2;
         index.push(p, p + 1, p + 2, p + 1, p + 3, p + 2);
+        edges.push(p, p + 2, p + 1, p + 3);
       }
     }
   }
@@ -104,7 +131,7 @@ export function createRays({ background }) {
     paint: { value: new THREE.Color('#ece8df') },
     center: { value: new THREE.Vector2() },
     light: { value: 0.8 },
-    // 1 = pliegues (cada tramo, una faceta); 0 = plano (una sola lámina).
+    // 1 = folds (cada tramo, una faceta); 0 = flat (una sola lámina).
     folds: { value: 1 },
   };
   const material = new THREE.ShaderMaterial({
@@ -189,8 +216,34 @@ export function createRays({ background }) {
   );
   hole.position.z = 0.01;
 
+  // El modo wire. El contorno de las bandas: los mismos puntos, unidos con líneas, y girando
+  // con ellas (dentro de «spin»).
+  const outlineGeometry = new THREE.BufferGeometry();
+  outlineGeometry.setAttribute('position', geometry.getAttribute('position'));
+  outlineGeometry.setIndex(edges);
+  const outline = new THREE.LineSegments(outlineGeometry, new THREE.LineBasicMaterial({ color: WIRE_LINE }));
+  outline.frustumCulled = false;
+  outline.visible = false;
+  spin.add(outline);
+  // Las guías, que no giran: el radio 1, los anillos del zigzag (hasta bien fuera del
+  // recuadro), y en el agujero (crecen con él), su borde y una cruz.
+  const guides = new THREE.Group();
+  guides.add(circle(RADIUS, dashed));
+  for (let k = 1; k <= ZIGS * 6; k++) if (k !== ZIGS) guides.add(circle(HOLE + (k * (RADIUS - HOLE)) / ZIGS, dashed));
+  const holeLine = new THREE.LineBasicMaterial({ color: WIRE_LINE });
+  hole.add(circle(HOLE, holeLine));
+  const cross = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints(
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].map(([x, y]) => new THREE.Vector3(x * HOLE * 0.3, y * HOLE * 0.3, 0.02)),
+    ),
+    holeLine,
+  );
+  hole.add(cross);
+  const wireParts = [guides, ...hole.children];
+  for (const part of wireParts) part.visible = false;
+
   const object = new THREE.Group();
-  object.add(spin, hole);
+  object.add(spin, hole, guides);
 
   // Cada fotograma (main.js): el giro y hacia dónde está la luz.
   function update(angle, light) {
@@ -201,10 +254,10 @@ export function createRays({ background }) {
 
   // Para tirarlo (al crear uno nuevo): libera lo que ocupa en la tarjeta gráfica.
   function dispose() {
-    geometry.dispose();
-    material.dispose();
-    hole.geometry.dispose();
-    hole.material.dispose();
+    object.traverse((child) => {
+      child.geometry?.dispose();
+      if (child.material !== dashed) child.material?.dispose();
+    });
   }
 
   // El tamaño del agujero (1 = el de siempre): crece mientras se mantiene pulsado.
@@ -212,10 +265,16 @@ export function createRays({ background }) {
     hole.scale.setScalar(size);
   }
 
-  // El modo: true, pliegues; false, plano.
-  function setFolds(on) {
-    uniforms.folds.value = on ? 1 : 0;
+  // El modo: «folds» (cada tramo, una faceta), «flat» (una sola lámina) o «wire» (el
+  // contorno y las guías, sobre el papel).
+  function setLook(look) {
+    const wire = look === 'wire';
+    uniforms.folds.value = look === 'folds' ? 1 : 0;
+    material.visible = !wire;
+    outline.visible = wire;
+    for (const part of wireParts) part.visible = wire;
+    hole.material.color.set(wire ? WIRE_PAPER : background);
   }
 
-  return { object, update, setFolds, setHoleSize, dispose };
+  return { object, update, setLook, setHoleSize, dispose };
 }

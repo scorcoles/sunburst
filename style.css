@@ -57,6 +57,25 @@ body {
   cursor: crosshair;
 }
 
+/* La ficha del modo wire, abajo a la derecha del recuadro: gris y negro, como en
+   vertikis. */
+.notes {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 6px 9px;
+  border: 1px solid #333333;
+  background: #eeeeee;
+  color: #333333;
+  font: 9px/1.6 ui-monospace, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.notes[hidden] {
+  display: none;
+}
+
 /* Abajo: el pie, entre dos líneas blancas. */
 .foot {
   margin-bottom: 1rem;
