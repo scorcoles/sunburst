@@ -92,6 +92,14 @@ const ZOOM_SPIN = 1.2;
 const LIGHT = 0.8;
 const LIGHT_REACH = 1.6;
 const LIGHT_EASE = 0.4;
+// En el móvil, la luz la mueve el propio móvil: girarlo (de lado a lado, como un volante
+// tumbado) mueve la luz alrededor del agujero, TILT_REACH por cada 45°; e inclinarlo
+// (hacia ti o hacia fuera) corre el brillo y el arcoíris por la lámina, GLARE_REACH por
+// cada 45°. La postura de reposo se va adaptando sola, en REST segundos, para que sostenerlo
+// de otra forma no deje la luz fija en un sitio.
+const TILT_REACH = 1.2;
+const GLARE_REACH = 0.5;
+const REST = 6;
 
 const canvas = document.querySelector('[data-sunburst]');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -293,6 +301,27 @@ soundButton?.addEventListener('click', () => {
 // Compartir: una foto del cartel. El marco, del negro del fondo; el texto, del blanco.
 setupShare(canvas, () => renderer.render(scene, camera), () => ({ background: BACKGROUND, ink: '#ece8df' }));
 
+// La orientación del móvil: lo que se ha girado e inclinado desde su reposo, de -1 a 1
+// (o null si no hay). En iOS hay que pedir permiso, con un toque: al primero.
+let tilt = null;
+let rest = null;
+const coarse = window.matchMedia('(pointer: coarse)');
+window.addEventListener('deviceorientation', (e) => {
+  // Solo en pantallas táctiles: un portátil con sensores sigue con el ratón.
+  if (e.beta == null || e.gamma == null || !coarse.matches) return;
+  const now = { beta: e.beta, gamma: e.gamma };
+  if (!rest) rest = { ...now };
+  const clamp = (v) => Math.max(-1, Math.min(1, v / 45));
+  tilt = { side: clamp(now.gamma - rest.gamma), lean: clamp(now.beta - rest.beta), raw: now };
+});
+const askTilt = () => {
+  window.removeEventListener('pointerup', askTilt);
+  const ask = window.DeviceOrientationEvent?.requestPermission;
+  if (typeof ask === 'function') ask.call(window.DeviceOrientationEvent).catch(() => {});
+};
+window.addEventListener('pointerup', askTilt);
+let glare = 0;
+
 // Cada fotograma: gira, la luz se acerca a donde apunta el ratón, y se pinta.
 let time = 0;
 let angle = 0;
@@ -306,7 +335,18 @@ renderer.setAnimationLoop((now) => {
   // Con el zoom, los rayos giran más deprisa (como si cayeras hacia el centro de un
   // remolino): a ZOOM_SPIN veces más por cada vez que se acerca.
   angle += spinAt(time) * dt * (1 + (zoom - 1) * ZOOM_SPIN);
-  light += (LIGHT - pointerX * LIGHT_REACH - light) * Math.min(1, dt / LIGHT_EASE);
+  // La luz: con el móvil, de su orientación; si no, del ratón.
+  let lightGoal = LIGHT - pointerX * LIGHT_REACH;
+  let glareGoal = 0;
+  if (tilt) {
+    lightGoal = LIGHT - tilt.side * TILT_REACH;
+    glareGoal = tilt.lean * GLARE_REACH;
+    const ease = Math.min(1, dt / REST);
+    rest.beta += (tilt.raw.beta - rest.beta) * ease;
+    rest.gamma += (tilt.raw.gamma - rest.gamma) * ease;
+  }
+  light += (lightGoal - light) * Math.min(1, dt / LIGHT_EASE);
+  glare += (glareGoal - glare) * Math.min(1, dt / LIGHT_EASE);
   // El agujero: el muelle tira de él hacia su objetivo (un trozo del camino hacia el
   // cursor) y el rozamiento lo frena. Sin cursor, nada tira de él: frena y se queda donde
   // esté, y ese es su sitio nuevo (desde donde seguirá al cursor cuando vuelva).
@@ -336,7 +376,7 @@ renderer.setAnimationLoop((now) => {
   if (pressed) zoom = Math.min(ZOOM_MAX, zoom + ZOOM * dt);
   else if (!holding) zoom += (1 - zoom) * Math.min(1, dt / ZOOM_BACK);
   sun.object.scale.setScalar(zoom);
-  sun.update(angle, light);
+  sun.update(angle, light, glare);
   tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight), hole.vx * half.width, hole.vy * half.height);
   // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
   // (de -1 a 1 hasta donde puede llegar) y lo que ha crecido.

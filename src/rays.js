@@ -133,6 +133,8 @@ export function createRays({ background }) {
     light: { value: 0.8 },
     // 1 = folds (cada tramo, una faceta); 0 = flat (una sola lámina).
     folds: { value: 1 },
+    // Cuánto se corre el brillo (y el arcoíris), con la inclinación del móvil.
+    glare: { value: 0 },
   };
   const material = new THREE.ShaderMaterial({
     uniforms,
@@ -157,6 +159,8 @@ export function createRays({ background }) {
       uniform vec2 center;
       uniform float light;
       uniform float folds;
+      uniform float glare;
+      const float FLAT_GREY = 0.72;
       varying vec3 vWorld;
       varying vec2 vLocal;
       varying float vFacet;
@@ -184,7 +188,7 @@ export function createRays({ background }) {
         float shade = 0.32 + 0.55 * sheen + soft + 0.8 * glint + 0.1 * brush;
         // El punto irisado: un arcoíris que cambia con el ángulo y la distancia, solo en
         // los brillos.
-        vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (screen / 3.1416 + r * 0.25 + vec3(0.0, 0.33, 0.67)));
+        vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (screen / 3.1416 + r * 0.25 + glare + vec3(0.0, 0.33, 0.67)));
         vec3 folded = paint * shade;
         folded = mix(folded, rainbow * (shade + 0.2), 0.35 * clamp(sheen + glint, 0.0, 1.0));
 
@@ -193,12 +197,15 @@ export function createRays({ background }) {
         // ancha y suave que cruza la pantalla; el arcoíris, bandas paralelas a ella. El
         // cepillado, rayitas rectas y paralelas sobre la lámina (giran con ella).
         vec2 toward = vec2(cos(light), sin(light));
-        float along = dot(vWorld.xy, toward);
+        float along = dot(vWorld.xy, toward) + glare * 2.0;
         float flatSheen = pow(0.5 + 0.5 * cos(along * 1.4), 5.0);
         float flatBrush = hash(floor(vLocal.x * 260.0)) - 0.5;
-        float flatShade = 0.34 + 0.62 * flatSheen + 0.07 * flatBrush;
-        vec3 flatRainbow = 0.5 + 0.5 * cos(6.2831 * (along * 0.3 + vec3(0.0, 0.33, 0.67)));
-        vec3 plane = mix(paint * flatShade, flatRainbow * (flatShade + 0.15), 0.25 + 0.3 * flatSheen);
+        // La lámina, más gris que el metal de los pliegues (FLAT_GREY), y con los
+        // reflejos de colores más vivos: casi nada en la sombra, mucho en el brillo.
+        float flatShade = 0.3 + 0.55 * flatSheen + 0.07 * flatBrush;
+        vec3 flatRainbow = 0.5 + 0.5 * cos(6.2831 * (along * 0.3 + glare + vec3(0.0, 0.33, 0.67)));
+        vec3 grey = vec3(dot(paint, vec3(0.333))) * FLAT_GREY;
+        vec3 plane = mix(grey * flatShade, flatRainbow * (flatShade + 0.25), 0.06 + 0.6 * flatSheen);
 
         gl_FragColor = vec4(mix(plane, folded, folds), 1.0);
         #include <colorspace_fragment>
@@ -246,7 +253,8 @@ export function createRays({ background }) {
   object.add(spin, hole, guides);
 
   // Cada fotograma (main.js): el giro y hacia dónde está la luz.
-  function update(angle, light) {
+  function update(angle, light, glare = 0) {
+    uniforms.glare.value = glare;
     spin.rotation.z = angle;
     uniforms.center.value.set(object.position.x, object.position.y);
     uniforms.light.value = light;
