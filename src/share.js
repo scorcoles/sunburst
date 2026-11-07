@@ -4,14 +4,16 @@
 //
 // Como en vortik y vertikis: el botón de arriba a la derecha abre el menú de compartir del
 // sistema con una foto del momento. La foto es un cartel pequeño: el recuadro tal cual, con
-// un marco negro y, abajo, «SUNBURST · VERTIK.NET». Donde no se puede compartir una imagen
-// (Firefox de escritorio, por ejemplo), el botón no aparece.
+// un marco del color de la página (negro; rosa en dots) y, abajo, «SUNBURST · VERTIK.NET».
+// Donde no se puede compartir una imagen (Firefox de escritorio, por ejemplo), el botón no
+// aparece.
 //
 // WebGL borra su imagen en cuanto el navegador la enseña: al pulsar, pintamos un fotograma
 // («render») y lo copiamos en el acto, sin esperar a nada.
 
-// «canvas»: el del recuadro. «render()»: pinta un fotograma ahora mismo.
-export function setupShare(canvas, render, { background, ink }) {
+// «canvas»: el del recuadro. «render()»: pinta un fotograma ahora mismo. «colors()»: los
+// colores del marco y del texto, { background, ink }, los del modo que esté puesto.
+export function setupShare(canvas, render, colors) {
   const button = document.querySelector('[data-share]');
   if (!button) return;
 
@@ -29,6 +31,7 @@ export function setupShare(canvas, render, { background, ink }) {
 
   function snapshot() {
     render();
+    const { background, ink } = colors();
     // El marco, en proporción al recuadro; abajo, más alto, para el texto.
     const side = Math.min(canvas.width, canvas.height);
     const frame = Math.round(side * 0.05);

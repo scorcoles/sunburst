@@ -10,6 +10,12 @@
   --side: 1rem;
 }
 
+/* En el modo dots, toda la página del rosa del recuadro, y lo que era blanco, en negro. */
+html[data-mode='dots'] {
+  --ink: #0d0d0d;
+  --black: #ef5a86;
+}
+
 html,
 body {
   margin: 0;

@@ -137,6 +137,8 @@ function showMode() {
   sun.object.visible = mode !== 'tunnel' && mode !== 'dots';
   sun.setLook(mode);
   renderer.setClearColor(mode === 'wire' ? WIRE_PAPER : mode === 'dots' ? PINK : BACKGROUND);
+  // El modo, en <html>: en dots, style.css pone toda la página en rosa y la letra en negro.
+  document.documentElement.dataset.mode = mode;
   if (notes) notes.hidden = mode !== 'wire';
 }
 
@@ -270,7 +272,9 @@ soundButton?.addEventListener('click', () => {
 });
 
 // Compartir: una foto del cartel. El marco, del negro del fondo; el texto, del blanco.
-setupShare(canvas, () => renderer.render(scene, camera), { background: BACKGROUND, ink: '#ece8df' });
+setupShare(canvas, () => renderer.render(scene, camera), () =>
+  mode === 'dots' ? { background: PINK, ink: BACKGROUND } : { background: BACKGROUND, ink: '#ece8df' },
+);
 
 // Cada fotograma: gira, la luz se acerca a donde apunta el ratón, y se pinta.
 let time = 0;
