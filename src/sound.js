@@ -17,6 +17,9 @@
 //     sitio distinto entre los dos altavoces;
 //   - al mover el cursor deprisa, un SOPLO: ruido por un filtro que sube y baja, en el
 //     altavoz del lado del cursor;
+//   - en el modo dots, cada onda que lanza un toque es un IMPACTO: un golpe muy grave que
+//     cae de tono, un estallido de ruido seco y una cola de metal que resuena unos
+//     segundos; mientras, todo lo demás se aparta un momento (baja y vuelve);
 //   - el AGUJERO manda en el tono: subirlo o bajarlo sube o baja todo (hasta 3 semitonos),
 //     llevarlo a un lado o al otro lo hace más brillante o más apagado; y con el zoom
 //     (manteniendo pulsado), todo baja y se cierra, como tragado.
@@ -49,6 +52,10 @@ const PLACE_PITCH = 300;
 const PLACE_FILTER = 1;
 const GROW_PITCH = 200;
 
+// El impacto: su volumen, y cuánto baja todo lo demás mientras suena (0,3 = al 30 %).
+const IMPACT_VOLUME = 0.9;
+const IMPACT_DUCK = 0.3;
+
 // Volumen general, y lo que tarda en entrar y en irse (segundos).
 const VOLUME = 0.4;
 const FADE = 2;
@@ -71,6 +78,8 @@ function random(a, b) {
 export function createSound() {
   let ctx = null;
   let master = null;
+  // Todo menos el impacto pasa por aquí: es lo que se aparta cuando suena.
+  let bed = null;
   let noise = null;
   // Lo que cambia con el agujero: las ondas del zumbido y del brillo, y el filtro.
   const tuned = [];
@@ -89,6 +98,8 @@ export function createSound() {
     master.gain.value = 0;
     const compressor = ctx.createDynamicsCompressor();
     master.connect(compressor).connect(ctx.destination);
+    bed = ctx.createGain();
+    bed.connect(master);
 
     // El filtro resonante y su respiración.
     lowpass = ctx.createBiquadFilter();
@@ -101,7 +112,7 @@ export function createSound() {
     breathDepth.gain.value = BREATH_DEPTH;
     breath.connect(breathDepth).connect(lowpass.frequency);
     breath.start();
-    lowpass.connect(master);
+    lowpass.connect(bed);
 
     // El zumbido: la nota y la quinta en diente de sierra, cada una desafinada hacia un
     // lado; y la octava de abajo, pura. (El desafinado va en la frecuencia: «detune» lo
@@ -124,7 +135,7 @@ export function createSound() {
     // El brillo: las tres notas de la campana, juntas en un volumen que late con el giro.
     shimmer = ctx.createGain();
     shimmer.gain.value = 0;
-    shimmer.connect(master);
+    shimmer.connect(bed);
     BELL_RATIOS.forEach((ratio, k) => {
       const osc = ctx.createOscillator();
       osc.frequency.value = BELL * ratio;
@@ -146,7 +157,7 @@ export function createSound() {
   function panned(pan) {
     const side = ctx.createStereoPanner();
     side.pan.value = pan;
-    side.connect(master);
+    side.connect(bed);
     return side;
   }
 
@@ -246,6 +257,60 @@ export function createSound() {
     setTimeout(() => !on && ctx.suspend(), (FADE / 2) * 1000 + 100);
   }
 
+  // Un impacto, en el lado del toque (-1 a 1). Tres capas: un golpe grave que cae de 90 a
+  // 28 Hz (por eso suena a golpe y no a nota) y se apaga en segundo y medio; un estallido
+  // de ruido muy corto y apagado; y una cola de metal (las proporciones de la campana sobre
+  // una nota grave) que resuena. Todo lo demás baja y vuelve en un par de segundos.
+  function impact(pan = 0) {
+    if (!on) return;
+    const now = ctx.currentTime;
+    const out = ctx.createStereoPanner();
+    out.pan.value = Math.max(-1, Math.min(1, pan)) * 0.6;
+    out.connect(master);
+
+    const boom = ctx.createOscillator();
+    boom.frequency.setValueAtTime(90, now);
+    boom.frequency.exponentialRampToValueAtTime(28, now + 0.9);
+    const boomLevel = ctx.createGain();
+    boomLevel.gain.setValueAtTime(0, now);
+    boomLevel.gain.linearRampToValueAtTime(IMPACT_VOLUME, now + 0.008);
+    boomLevel.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+    boom.connect(boomLevel).connect(out);
+    boom.start(now);
+    boom.stop(now + 1.65);
+
+    const crack = ctx.createBufferSource();
+    crack.buffer = noise;
+    const dull = ctx.createBiquadFilter();
+    dull.type = 'lowpass';
+    dull.frequency.value = 900;
+    const crackLevel = ctx.createGain();
+    crackLevel.gain.setValueAtTime(IMPACT_VOLUME * 0.5, now);
+    crackLevel.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    crack.connect(dull).connect(crackLevel).connect(out);
+    crack.start(now, random(0, 0.8));
+    crack.stop(now + 0.15);
+
+    const base = random(48, 62);
+    [1, 2.76, 5.4, 8.93].forEach((ratio, k) => {
+      const osc = ctx.createOscillator();
+      osc.frequency.value = base * ratio;
+      const level = ctx.createGain();
+      const decay = 3.2 / (k + 1);
+      level.gain.setValueAtTime(0, now);
+      level.gain.linearRampToValueAtTime((IMPACT_VOLUME * 0.25) / (k + 1), now + 0.01);
+      level.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+      osc.connect(level).connect(out);
+      osc.start(now);
+      osc.stop(now + decay + 0.05);
+    });
+
+    bed.gain.cancelScheduledValues(now);
+    bed.gain.setValueAtTime(bed.gain.value, now);
+    bed.gain.linearRampToValueAtTime(IMPACT_DUCK, now + 0.03);
+    bed.gain.linearRampToValueAtTime(1, now + 2.2);
+  }
+
   // Cada fotograma, con lo deprisa que va el cursor (recuadros por segundo) y en qué lado
   // está (-1 a 1): si va deprisa, un soplo (como mucho uno cada WHOOSH_GAP segundos).
   function update(speed, pan = 0) {
@@ -276,5 +341,6 @@ export function createSound() {
     toggle: () => (on ? stop() : start(), on),
     update,
     setShape,
+    impact,
   };
 }

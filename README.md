@@ -7,7 +7,7 @@ Demo: [scorcoles.github.io/sunburst](https://scorcoles.github.io/sunburst/) · E
 - Todo es un plano, como un cartel: arriba el símbolo; en medio, los rayos; abajo, el pie entre dos líneas.
 - 28 bandas que salen del agujero, se tuercen en espiral y se quiebran en zigzag, todas en paralelo, hasta salirse del recuadro.
 - El metal es un shader propio: una franja de brillo fija por la que pasan las bandas al girar, una faceta distinta en cada tramo del zigzag (cada una destella a su hora), un cepillado fino y un punto irisado en los brillos.
-- Cinco modos (← Prev · Next → en el pie, las flechas del teclado o `#flat`, `#tunnel`, `#dots`, `#wire` en la dirección): **folds**, cada tramo del zigzag una faceta que destella a su hora; **flat**, todas las bandas recortadas de una sola lámina de metal, con un brillo y un arcoíris que la cruzan en línea recta; **tunnel**, sin rayos: anillos blancos y negros que caen hacia el agujero como un embudo, con motas blancas en el negro como estrellas a lo lejos; **dots**, un paisaje en 3D dibujado solo con puntos negros sobre rosa (toda la página en rosa): el embudo, con los anillos cayendo hacia el agujero, y dos o tres montañas con cráter; cada toque lanza una onda por la superficie y el cursor levanta un bulto que lo sigue; y **wire**, para ver cómo está hecho: contornos, guías y los números, en gris y negro.
+- Cinco modos (← Prev · Next → en el pie, las flechas del teclado o `#flat`, `#tunnel`, `#dots`, `#wire` en la dirección): **folds**, cada tramo del zigzag una faceta que destella a su hora; **flat**, todas las bandas recortadas de una sola lámina de metal, con un brillo y un arcoíris que la cruzan en línea recta; **tunnel**, sin rayos: anillos blancos y negros que caen hacia el agujero como un embudo, con motas blancas en el negro como estrellas a lo lejos; **dots**, un pozo de gravedad dibujado solo con puntos negros sobre rosa (toda la página en rosa): la tela se hunde hacia el agujero y se pliega sobre sí misma en una garganta por la que caen los anillos; el cursor es una masa que la hunde y atrae los puntos, y deja una estela de ondas al pasar; cada toque lanza una onda grande, que suena a impacto; y **wire**, para ver cómo está hecho: contornos, guías y los números, en gris y negro.
 - Con el ratón pulsado o el dedo puesto, todo se acerca: un zoom con el centro en el agujero; al soltar, espera un momento (y no vuelve mientras el ratón esté sobre los botones de arriba: se puede compartir con el zoom) y vuelve.
 - Al seguir al cursor, el plano se inclina hacia donde va (con muy poca perspectiva: quieto, se ve plano).
 - Sonido (el altavoz de arriba): una nave a la deriva. Un zumbido de máquina, un brillo de metal que late cada vez que una banda pasa por la luz, golpes de metal y estática de radio de vez en cuando, y un soplo al mover el cursor deprisa. El agujero cambia el tono; con el zoom, todo baja. Y compartir: una foto del cartel.
@@ -23,7 +23,7 @@ Demo: [scorcoles.github.io/sunburst](https://scorcoles.github.io/sunburst/) · E
 | `src/main.js` | El escenario (cámara con muy poca perspectiva), el giro, la luz y el doble toque. |
 | `src/rays.js` | Las bandas, el shader del metal, el agujero y lo del modo wire. |
 | `src/tunnel.js` | El modo tunnel: los anillos, con su shader. |
-| `src/dots.js` | El modo dots: el paisaje de puntos (embudo, montañas, ondas y bulto), con su shader. |
+| `src/dots.js` | El modo dots: el pozo de gravedad de puntos (con las ondas y la masa del cursor), con su shader. |
 | `src/sound.js` · `src/share.js` | El sonido y compartir. |
 
 ```sh

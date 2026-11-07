@@ -8,7 +8,7 @@
 //
 //   rays.js  → las bandas, su metal (un shader) y el agujero
 //   tunnel.js → el modo túnel: anillos que caen hacia el agujero (otro shader)
-//   dots.js   → el modo dots: un paisaje de puntos negros sobre rosa
+//   dots.js   → el modo dots: un pozo de gravedad de puntos negros sobre rosa
 //   sound.js  → el sonido (el de vortik, adaptado: el agujero cambia el grave)
 //   share.js  → compartir una foto del cartel
 //   main.js  → el escenario, el giro, la luz, el doble toque y los modos (este archivo)
@@ -17,7 +17,7 @@
 // (#flat, #tunnel, #dots, #wire): «folds», cada tramo del zigzag una faceta que destella
 // por su cuenta; «flat», todas las bandas recortadas de una sola lámina de metal; «tunnel»,
 // sin rayos: anillos blancos y negros que caen hacia el agujero, con motas como estrellas;
-// «dots», un paisaje en 3D de puntos negros sobre rosa, con ondas; y «wire», siempre el
+// «dots», un pozo de gravedad de puntos negros sobre rosa; y «wire», siempre el
 // último, para ver cómo está hecho: contornos, guías y los números, en gris y negro.
 //
 // El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
@@ -75,6 +75,15 @@ const ZOOM_BACK = 0.35;
 // Al soltar, el zoom espera un momento antes de volver (segundos): da tiempo a llegar al
 // botón de compartir. Y con el ratón encima de los botones de arriba, no vuelve.
 const ZOOM_HOLD = 1.5;
+
+// En el modo dots, la estela del cursor: lo deprisa que tiene que ir (recuadros por
+// segundo), cada cuánto deja una onda (segundos) y su fuerza (la de un toque es 1).
+const WAKE_SPEED = 0.3;
+const WAKE_GAP = 0.12;
+const WAKE_STRENGTH = 0.3;
+let lastWake = 0;
+// Cuánto sube el pozo del modo dots respecto al agujero (en partes de medio recuadro).
+const DOTS_LIFT = 0.3;
 
 // La luz: hacia dónde está (radianes), cuánto la mueve el ratón (de un lado al otro del
 // recuadro) y lo que tarda en seguirlo (segundos).
@@ -212,9 +221,12 @@ let overTools = false;
 canvas.addEventListener('pointerdown', (e) => {
   if (e.isPrimary) pressed = true;
   // En el modo dots, cada toque lanza una onda desde donde cae.
+  // Y suena a impacto.
   if (mode === 'dots') {
     const rect = canvas.getBoundingClientRect();
-    dots.ripple(((e.clientX - rect.left) / rect.width) * 2 - 1, 1 - ((e.clientY - rect.top) / rect.height) * 2, camera);
+    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    dots.ripple(x, 1 - ((e.clientY - rect.top) / rect.height) * 2, camera);
+    sound.impact(x);
   }
 });
 for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
@@ -316,7 +328,10 @@ renderer.setAnimationLoop((now) => {
   sun.object.rotation.set(clampLean(-hole.vy * LEAN), clampLean(hole.vx * LEAN), 0);
   tunnel.object.rotation.copy(sun.object.rotation);
   // Los puntos: en el agujero, vistos en ángulo (DOTS_TILT) y con la misma inclinación.
+  // (Un poco más arriba que el agujero de los otros modos: la garganta del pozo cuelga por
+  // debajo y, si no, el pie la taparía.)
   dots.object.position.copy(sun.object.position);
+  dots.object.position.y += half.height * DOTS_LIFT;
   dots.object.rotation.set(DOTS_TILT + sun.object.rotation.x, sun.object.rotation.y, 0);
   // El zoom: pulsado, se acerca a ritmo constante; suelto, vuelve, deprisa al principio.
   // Los rayos (con su agujero y las guías del wire) se agrandan desde el agujero, que es
@@ -330,6 +345,11 @@ renderer.setAnimationLoop((now) => {
   dots.update(dt, angle, renderer.getPixelRatio(), camera.position.z);
   // El bulto del terreno sigue al cursor (o se va, si no hay cursor).
   if (mode === 'dots') dots.setCursor(pointer ? pointer.x : null, pointer ? pointer.y : null, camera);
+  // Y al pasar, deja una estela de ondas pequeñas (una cada WAKE_GAP segundos, si se mueve).
+  if (mode === 'dots' && pointer && pointerSpeed > WAKE_SPEED && time - lastWake > WAKE_GAP) {
+    lastWake = time;
+    dots.ripple(pointer.x, pointer.y, camera, WAKE_STRENGTH);
+  }
   sun.update(angle, light);
   tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight));
   // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
