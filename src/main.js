@@ -79,8 +79,8 @@ const ZOOM_HOLD = 1.5;
 // En el modo dots, la estela del cursor: lo deprisa que tiene que ir (recuadros por
 // segundo), cada cuánto deja una onda (segundos) y su fuerza (la de un toque es 1).
 const WAKE_SPEED = 0.3;
-const WAKE_GAP = 0.12;
-const WAKE_STRENGTH = 0.3;
+const WAKE_GAP = 0.25;
+const WAKE_STRENGTH = 0.12;
 let lastWake = 0;
 // Cuánto sube el pozo del modo dots respecto al agujero (en partes de medio recuadro).
 const DOTS_LIFT = 0.3;
