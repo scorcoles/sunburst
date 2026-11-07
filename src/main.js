@@ -8,6 +8,8 @@
 //
 //   rays.js  → las bandas, su metal (un shader) y el agujero
 //   tunnel.js → el modo túnel: anillos que caen hacia el agujero (otro shader)
+//   sound.js  → el sonido (el de vortik, adaptado: el agujero cambia el grave)
+//   share.js  → compartir una foto del cartel
 //   main.js  → el escenario, el giro, la luz, el doble toque y los modos (este archivo)
 //
 // Cuatro modos, con «Prev» y «Next» en el pie, las flechas del teclado o la dirección
@@ -26,6 +28,8 @@
 import * as THREE from 'three';
 import { createRays, HOLE, INFO, WIRE_PAPER } from './rays.js';
 import { createTunnel } from './tunnel.js';
+import { createSound } from './sound.js';
+import { setupShare } from './share.js';
 import '../style.css';
 
 const BACKGROUND = '#0d0d0d';
@@ -52,6 +56,11 @@ const PULL = 4;
 const DRAG = 4.4;
 const ROAM = 0.85;
 
+// Al seguir al cursor, el plano se inclina hacia donde va: cuánto por cada unidad de
+// velocidad del agujero (radianes) y como mucho cuánto.
+const LEAN = 0.35;
+const LEAN_MAX = 0.4;
+
 // El agujero que crece: cuánto por segundo mientras se mantiene pulsado (1 = su tamaño
 // cada segundo), hasta cuánto (veces su tamaño) y lo que tarda en volver al soltar (s).
 const GROW = 0.9;
@@ -70,8 +79,10 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setClearColor(BACKGROUND);
 
 const scene = new THREE.Scene();
-// Cámara ortográfica: sin perspectiva, todo plano.
-const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10);
+// Cámara con muy poca perspectiva (un ángulo de visión cerrado, mirando desde lejos):
+// quieto, todo se ve plano; al inclinarse siguiendo al cursor, se nota hacia dónde.
+const FOV = 18;
+const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 100);
 // La mitad del ancho y del alto de lo que se ve (en radios).
 const half = { width: 1, height: 1 };
 
@@ -84,10 +95,9 @@ function resize() {
   const short = 1 / FILL;
   half.width = w < h ? short : (short * w) / h;
   half.height = w < h ? (short * h) / w : short;
-  camera.left = -half.width;
-  camera.right = half.width;
-  camera.top = half.height;
-  camera.bottom = -half.height;
+  // Lo bastante lejos para que, en el plano z = 0, se vea justo el medio alto «half.height».
+  camera.aspect = w / h;
+  camera.position.z = half.height / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
   camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(canvas);
@@ -153,10 +163,20 @@ newSun();
 // está encima. El agujero lo sigue con su muelle, y la luz, con su lado a lado (pointerX).
 let pointerX = 0;
 let pointer = null;
+// Y lo deprisa que va (en recuadros por segundo), para el scratch del sonido: se mide en
+// cada movimiento y se va apagando solo.
+let pointerSpeed = 0;
+let lastMove = null;
 canvas.addEventListener('pointermove', (e) => {
   const rect = canvas.getBoundingClientRect();
   pointerX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   pointer = { x: pointerX, y: 1 - ((e.clientY - rect.top) / rect.height) * 2 };
+  const now = performance.now();
+  if (lastMove && now > lastMove.time) {
+    const moved = Math.hypot(pointer.x - lastMove.x, pointer.y - lastMove.y) / 2;
+    pointerSpeed = moved / ((now - lastMove.time) / 1000);
+  }
+  lastMove = { x: pointer.x, y: pointer.y, time: now };
 });
 canvas.addEventListener('pointerleave', () => {
   pointer = null;
@@ -210,6 +230,19 @@ const fromHash = () => setMode(decodeURIComponent(location.hash.slice(1)));
 window.addEventListener('hashchange', fromHash);
 fromHash();
 
+// El sonido, con el altavoz de arriba a la derecha: apagado hasta que se pulsa.
+const sound = createSound();
+const soundButton = document.querySelector('[data-sound]');
+soundButton?.addEventListener('click', () => {
+  const playing = sound.toggle();
+  soundButton.classList.toggle('is-on', playing);
+  soundButton.setAttribute('aria-pressed', String(playing));
+  soundButton.setAttribute('aria-label', playing ? 'Apagar el sonido' : 'Encender el sonido');
+});
+
+// Compartir: una foto del cartel. El marco, del negro del fondo; el texto, del blanco.
+setupShare(canvas, () => renderer.render(scene, camera), { background: BACKGROUND, ink: '#ece8df' });
+
 // Cada fotograma: gira, la luz se acerca a donde apunta el ratón, y se pinta.
 let time = 0;
 let angle = 0;
@@ -232,10 +265,20 @@ renderer.setAnimationLoop((now) => {
     hole[axis] += hole[v] * dt;
   }
   sun.object.position.set(hole.x * half.width, hole.y * half.height, 0);
+  // La inclinación: hacia donde se mueve el agujero (a la derecha, el lado derecho se
+  // hunde; hacia arriba, el de arriba), con el centro en el agujero. El túnel, igual.
+  const clampLean = (v) => Math.max(-LEAN_MAX, Math.min(LEAN_MAX, v));
+  sun.object.rotation.set(clampLean(-hole.vy * LEAN), clampLean(hole.vx * LEAN), 0);
+  tunnel.object.rotation.copy(sun.object.rotation);
   // Pulsado, crece a ritmo constante; suelto, vuelve a su tamaño, deprisa al principio.
   holeSize = pressed ? Math.min(GROW_MAX, holeSize + GROW * dt) : holeSize + (1 - holeSize) * Math.min(1, dt / SHRINK);
   sun.setHoleSize(holeSize);
   sun.update(angle, light);
   tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, HOLE * holeSize);
+  // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
+  // (de -1 a 1 hasta donde puede llegar) y lo que ha crecido.
+  sound.update(pointerSpeed, pointerX);
+  pointerSpeed *= Math.exp(-dt * 10);
+  sound.setShape(hole.x / ROAM, hole.y / ROAM, holeSize, angle);
   renderer.render(scene, camera);
 });

@@ -12,6 +12,26 @@
     <header class="top">
       <!-- En la web de VERTIK, aquí va su símbolo. -->
       <a class="brand" href="https://www.vertik.net/">VERTIK</a>
+      <!-- Arriba a la derecha: el sonido (src/sound.js), apagado de entrada, y compartir una
+           foto del cartel como está ahora (src/share.js; si el navegador no sabe compartir
+           imágenes, no aparece). -->
+      <div class="tools">
+        <button type="button" class="sound" data-sound aria-pressed="false" aria-label="Encender el sonido">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 9h3.5L12 4.5v15L6.5 15H3z" fill="currentColor" stroke="none" />
+            <path class="sound__on" d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.3a8 8 0 0 1 0 11.4" />
+            <path class="sound__off" d="M15.8 9.2l5.2 5.6M21 9.2l-5.2 5.6" />
+          </svg>
+        </button>
+        <button type="button" class="share" data-share hidden aria-label="Compartir una imagen del cartel">
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M8.6 10.5 15.4 6.5M8.6 13.5l6.8 4" fill="none" />
+            <circle cx="18" cy="5" r="3" stroke="none" />
+            <circle cx="6" cy="12" r="3" stroke="none" />
+            <circle cx="18" cy="19" r="3" stroke="none" />
+          </svg>
+        </button>
+      </div>
     </header>
 
     <main class="panel">

@@ -18,9 +18,10 @@
 
 import * as THREE from 'three';
 
-// Cuántos anillos hay del agujero al borde de fuera, y lo que avanzan hacia dentro por
-// segundo (en anillos).
-const RINGS = 26;
+// Cuántos anillos hay del agujero al borde de fuera (no hace falta que sea entero: 23,6
+// = las bandas un 10 % más anchas que con 26), y lo que avanzan hacia dentro por segundo
+// (en anillos).
+const RINGS = 23.6;
 const FLOW = 0.35;
 // Lo fino que es el grano de las motas blancas (más = motas más pequeñas).
 const GRAIN = 150;
@@ -86,7 +87,7 @@ export function createTunnel({ paper, ink }) {
         // Las franjas: medio anillo negro, medio blanco, avanzando hacia dentro con
         // «phase». El borde, suavizado lo justo para que no salgan dientes (fwidth: cuánto
         // cambia de un píxel al de al lado).
-        float x = t * float(${RINGS}) + phase;
+        float x = t * ${RINGS.toFixed(2)} + phase;
         float w = fwidth(x);
         float stripe = smoothstep(0.5 - w, 0.5 + w, abs(fract(x) - 0.5) * 2.0);
         float black = 1.0 - stripe;
@@ -122,7 +123,8 @@ export function createTunnel({ paper, ink }) {
   // el agujero se mueve.
   function update(dt, half, holeX, holeY, holeRadius) {
     phase += FLOW * dt;
-    object.scale.set(half.width, half.height, 1);
+    // (Un poco más grande que el recuadro: al inclinarse, que no se vean sus bordes.)
+    object.scale.set(half.width * 1.5, half.height * 1.5, 1);
     uniforms.hole.value.set(holeX, holeY);
     uniforms.holeRadius.value = holeRadius;
     uniforms.outer.value.set(-holeX * LEAN, -holeY * LEAN + half.height * LIFT);

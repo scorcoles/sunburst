@@ -40,6 +40,72 @@ body {
   text-decoration: none;
 }
 
+/* Arriba a la derecha: el sonido y compartir, algo apagados hasta que pasas por encima. */
+.tools {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.sound,
+.share {
+  display: block;
+  margin: 0;
+  padding: 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  line-height: 0;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 200ms ease;
+}
+
+.share[hidden] {
+  display: none;
+}
+
+/* Solo con ratón: en el móvil, al tocar, se quedaría «con el ratón encima». */
+@media (hover: hover) {
+  .sound:hover,
+  .share:hover {
+    opacity: 1;
+  }
+}
+
+.sound:focus-visible,
+.share:focus-visible {
+  opacity: 1;
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Sonando, del todo; con ondas si suena, con una equis si no. */
+.sound.is-on {
+  opacity: 1;
+}
+
+.sound__on,
+.sound.is-on .sound__off {
+  display: none;
+}
+
+.sound.is-on .sound__on {
+  display: inline;
+}
+
+.share svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* El altavoz, un poco más grande para que no se quede pequeño al lado de compartir. */
+.sound svg {
+  width: 26px;
+  height: 26px;
+  margin: -3px;
+}
+
 /* En medio: el recuadro, con aire arriba y abajo. El canvas lo llena entero. */
 .panel {
   position: relative;
