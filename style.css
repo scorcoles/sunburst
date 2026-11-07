@@ -34,6 +34,7 @@ body {
 
 /* Arriba: el símbolo. */
 .top {
+  grid-row: 1;
   display: flex;
   align-items: center;
   height: 4.5rem;
@@ -114,6 +115,7 @@ body {
 
 /* En medio: el recuadro, con aire arriba y abajo. El canvas lo llena entero. */
 .panel {
+  grid-row: 2;
   position: relative;
   margin: 1rem 0;
   min-height: 0;
@@ -150,6 +152,7 @@ body {
 
 /* Abajo: el pie, entre dos líneas blancas. */
 .foot {
+  grid-row: 3;
   margin-bottom: 1rem;
   border-top: 1px solid var(--ink);
   border-bottom: 1px solid var(--ink);
@@ -193,6 +196,31 @@ html[data-mode='dots'] .foot p {
 html[data-mode='dots'] .foot__tag {
   background: var(--black);
   color: var(--ink);
+}
+
+/* Y en el modo dots, los puntos ocupan toda la pantalla: el recuadro llena la ventana, por
+   debajo de la cabecera, del pie y de los lados; encima quedan solo el símbolo, los botones
+   y el bloque del pie. (La cabecera deja pasar el ratón y el dedo a los puntos, salvo en
+   el símbolo y los botones.) */
+html[data-mode='dots'] .panel {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+}
+
+html[data-mode='dots'] .top,
+html[data-mode='dots'] .foot {
+  position: relative;
+  z-index: 1;
+}
+
+html[data-mode='dots'] .top {
+  pointer-events: none;
+}
+
+html[data-mode='dots'] .top a,
+html[data-mode='dots'] .tools {
+  pointer-events: auto;
 }
 
 /* Prev y Next: botones que parecen texto del pie (como en vortik y vertikis). */
