@@ -5,7 +5,7 @@
 // Anillos negros y blancos, uno dentro de otro, pero no concéntricos: cada uno tiene el
 // centro un poco más cerca del agujero que el anterior, y eso dibuja un embudo en
 // perspectiva, un túnel. Los anillos fluyen hacia dentro, como tragados. Encima, el
-// desgaste de una impresión vieja: motas, rayas y zonas gastadas, fijas en el papel.
+// desgaste de una impresión vieja: motas blancas en el negro, fijas en el papel.
 //
 // Todo lo pinta un shader sobre un rectángulo que llena el recuadro. Los anillos son una
 // familia de círculos: el de «t = 0» es el agujero y el de «t = 1» el borde de fuera; entre
@@ -91,20 +91,14 @@ export function createTunnel({ paper, ink }) {
         // Dentro del agujero, negro.
         black = max(black, step(C, 0.0));
 
-        // El desgaste, fijo en el papel: motas de tinta en el blanco y huecos blancos en el
-        // negro; rayas finas verticales; y zonas donde la tinta se ha comido y queda gris.
+        // El desgaste, fijo en el papel: solo en el negro, motas blancas, como tinta que no
+        // ha llegado a agarrar. El blanco queda limpio. (Y fuera del agujero: dentro, negro
+        // limpio.)
         vec2 uv = vWorld;
-        float specks = step(0.9, noise(uv * 55.0)) * step(0.68, noise(uv * 4.0 + 3.0));
-        float holes = step(0.88, noise(uv * 70.0 + 11.0)) * step(0.66, noise(uv * 3.5 + 7.0));
-        float scratch = step(0.996, hash(vec2(floor(uv.x * 220.0), 0.0))) * step(0.45, noise(vec2(uv.x * 40.0, uv.y * 1.5)));
-        float worn = smoothstep(0.72, 0.9, noise(uv * 1.8 + 21.0));
-        // (Solo fuera del agujero: dentro, negro limpio.)
+        float specks = step(0.88, noise(uv * 70.0 + 11.0)) * step(0.66, noise(uv * 3.5 + 7.0));
         float outside = step(0.0, C);
-        black = mix(black, 1.0, specks * (1.0 - black) * outside);
-        black = mix(black, 0.0, (holes + scratch) * black * outside);
+        black = mix(black, 0.0, specks * black * outside);
         vec3 color = mix(paper, ink, black);
-        // Lo gastado: el negro se aclara un poco y el blanco se ensucia.
-        color = mix(color, mix(paper, ink, 0.55), worn * 0.12 * outside);
         gl_FragColor = vec4(color, 1.0);
         #include <colorspace_fragment>
       }
