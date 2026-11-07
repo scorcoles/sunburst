@@ -99,8 +99,9 @@ const MODES = ['folds', 'flat', 'tunnel', 'wire'];
 const OLD_NAMES = { pliegues: 'folds', plano: 'flat', tunel: 'tunnel' };
 let mode = MODES[0];
 
-// El túnel: uno para siempre (no tiene nada al azar), escondido salvo en su modo.
-const tunnel = createTunnel({ paper: '#e9e6df', ink: '#111111' });
+// El túnel: uno para siempre (no tiene nada al azar), escondido salvo en su modo. Su tinta,
+// el mismo negro del fondo: el agujero y el marco, exactamente igual de negros.
+const tunnel = createTunnel({ paper: '#e9e6df', ink: BACKGROUND });
 scene.add(tunnel.object);
 
 // Lo que se ve en cada modo: el túnel, o los rayos con su metal.
