@@ -239,3 +239,16 @@ body {
     display: none;
   }
 }
+
+/* En escritorio, «Prev · Next» alineado a la derecha del pie; el «·» que los separaba del
+   resto sobra. */
+@media (min-width: 64rem) and (pointer: fine) {
+  .foot__modes {
+    float: right;
+    margin-left: 1.2em;
+  }
+
+  .foot__sep:has(+ wbr + .foot__modes) {
+    display: none;
+  }
+}
