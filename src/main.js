@@ -8,7 +8,7 @@
 //
 //   rays.js  → las bandas, su metal (un shader) y el agujero
 //   tunnel.js → el modo túnel: anillos que caen hacia el agujero (otro shader)
-//   dots.js   → el modo dots: el embudo dibujado con puntos negros sobre rosa
+//   dots.js   → el modo dots: un paisaje de puntos negros sobre rosa
 //   sound.js  → el sonido (el de vortik, adaptado: el agujero cambia el grave)
 //   share.js  → compartir una foto del cartel
 //   main.js  → el escenario, el giro, la luz, el doble toque y los modos (este archivo)
@@ -17,7 +17,7 @@
 // (#flat, #tunnel, #dots, #wire): «folds», cada tramo del zigzag una faceta que destella
 // por su cuenta; «flat», todas las bandas recortadas de una sola lámina de metal; «tunnel»,
 // sin rayos: anillos blancos y negros que caen hacia el agujero, con motas como estrellas;
-// «dots», el embudo en 3D dibujado con puntos negros sobre rosa; y «wire», siempre el
+// «dots», un paisaje en 3D de puntos negros sobre rosa, con ondas; y «wire», siempre el
 // último, para ver cómo está hecho: contornos, guías y los números, en gris y negro.
 //
 // El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
@@ -169,6 +169,8 @@ function newSun() {
   sun = createRays({ background: BACKGROUND });
   const random = () => (Math.random() * 2 - 1) * OFFSET;
   offset = { x: random(), y: random() };
+  // Y un paisaje nuevo para el modo dots.
+  dots.regenerate();
   // El sol nuevo aparece en su sitio, quieto, y en el modo que esté puesto.
   Object.assign(hole, { x: offset.x, y: offset.y, vx: 0, vy: 0 });
   scene.add(sun.object);
@@ -209,6 +211,11 @@ let releasedAt = -Infinity;
 let overTools = false;
 canvas.addEventListener('pointerdown', (e) => {
   if (e.isPrimary) pressed = true;
+  // En el modo dots, cada toque lanza una onda desde donde cae.
+  if (mode === 'dots') {
+    const rect = canvas.getBoundingClientRect();
+    dots.ripple(((e.clientX - rect.left) / rect.width) * 2 - 1, 1 - ((e.clientY - rect.top) / rect.height) * 2, camera);
+  }
 });
 for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
   canvas.addEventListener(type, () => {
@@ -321,6 +328,8 @@ renderer.setAnimationLoop((now) => {
   sun.object.scale.setScalar(zoom);
   dots.object.scale.setScalar(zoom);
   dots.update(dt, angle, renderer.getPixelRatio(), camera.position.z);
+  // El bulto del terreno sigue al cursor (o se va, si no hay cursor).
+  if (mode === 'dots') dots.setCursor(pointer ? pointer.x : null, pointer ? pointer.y : null, camera);
   sun.update(angle, light);
   tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight));
   // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
