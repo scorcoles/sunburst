@@ -4,10 +4,10 @@ Un sol de rayos de metal que gira alrededor de un agujero negro. Un experimento 
 
 Demo: [scorcoles.github.io/sunburst](https://scorcoles.github.io/sunburst/) · En la web: [vertik.net/sunburst](https://www.vertik.net/sunburst/)
 
-- Todo es un plano, como un cartel: arriba el símbolo y una línea; en medio, los rayos; abajo, el pie entre dos líneas.
+- Todo es un plano, como un cartel: arriba el símbolo; en medio, los rayos; abajo, el pie entre dos líneas.
 - 28 bandas que salen del agujero, se tuercen en espiral y se quiebran en zigzag, todas en paralelo, hasta salirse del recuadro.
 - El metal es un shader propio: una franja de brillo fija por la que pasan las bandas al girar, una faceta distinta en cada tramo del zigzag (cada una destella a su hora), un cepillado fino y un punto irisado en los brillos.
-- El cursor mueve la luz. Doble clic o doble toque: un sol nuevo, con el agujero en otro sitio.
+- El agujero sigue al cursor, con pereza: tarda en arrancar, no llega del todo y frena sin rebotar; si el cursor se va, vuelve a su sitio. El cursor también mueve la luz. Doble clic o doble toque: un sol nuevo, con el agujero en otro sitio.
 
 ## Cómo está hecho
 

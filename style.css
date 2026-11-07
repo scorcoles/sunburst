@@ -1,7 +1,7 @@
 /* =========================================================================================
    Sunburst: todo es un plano, como un cartel
    =========================================================================================
-   Tres filas: arriba el símbolo con una línea debajo, en medio el recuadro de los rayos
+   Tres filas: arriba el símbolo, en medio el recuadro de los rayos
    (que ocupa todo lo que sobra) y abajo el pie entre dos líneas. A los lados, aire negro. */
 
 :root {
@@ -26,12 +26,11 @@ body {
   box-sizing: border-box;
 }
 
-/* Arriba: el símbolo, y una línea blanca de lado a lado. */
+/* Arriba: el símbolo. */
 .top {
   display: flex;
   align-items: center;
   height: 4.5rem;
-  border-bottom: 1px solid var(--ink);
 }
 
 .brand {

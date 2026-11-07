@@ -3,14 +3,16 @@
 // =========================================================================================
 //
 // Un experimento de VERTIK, en homenaje a la portada de «Death in Space» (2021). Todo es un
-// plano, como un cartel: arriba el símbolo y una línea; en medio, el recuadro con los
+// plano, como un cartel: arriba el símbolo; en medio, el recuadro con los
 // rayos; abajo, el pie entre dos líneas.
 //
 //   rays.js  → las bandas, su metal (un shader) y el agujero
 //   main.js  → el escenario, el giro, la luz y el doble toque (este archivo)
 //
-// El agujero cae en un sitio al azar del recuadro; con doble clic o doble toque, sale un
-// sol nuevo (otro sitio, otros destellos). Mover el ratón o el dedo mueve la luz.
+// El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
+// en arrancar, no llega del todo y, si el cursor se va, vuelve a su sitio. Con doble clic o
+// doble toque, sale un sol nuevo (otro sitio, otros destellos). Mover el ratón o el dedo
+// también mueve la luz.
 
 import * as THREE from 'three';
 import { createRays } from './rays.js';
@@ -30,6 +32,15 @@ const OFFSET = 0.55;
 const SPIN = -0.12;
 const PULSE = 0.5;
 const spinAt = (time) => SPIN * (1 + PULSE * (0.7 * Math.sin(0.6 * time) + 0.3 * Math.sin(1.7 * time + 1)));
+
+// El agujero sigue al cursor con un muelle: FOLLOW es hasta dónde se deja llevar (1 = hasta
+// el cursor; 0,6 = un 60 % del camino desde su sitio), PULL lo fuerte que tira el muelle y
+// DRAG el rozamiento (con este, frena sin rebotar: se nota pesado, con resistencia). Y
+// hasta dónde puede irse, en partes de medio recuadro.
+const FOLLOW = 0.6;
+const PULL = 4;
+const DRAG = 4.4;
+const ROAM = 0.85;
 
 // La luz: hacia dónde está (radianes), cuánto la mueve el ratón (de un lado al otro del
 // recuadro) y lo que tarda en seguirlo (segundos).
@@ -69,6 +80,8 @@ resize();
 // El sol: sus rayos y, al azar, dónde está su agujero.
 let sun = null;
 let offset = { x: 0, y: 0 };
+// Dónde está el agujero ahora y a qué velocidad va (en partes de medio recuadro).
+const hole = { x: 0, y: 0, vx: 0, vy: 0 };
 function newSun() {
   if (sun) {
     scene.remove(sun.object);
@@ -77,15 +90,23 @@ function newSun() {
   sun = createRays({ background: BACKGROUND });
   const random = () => (Math.random() * 2 - 1) * OFFSET;
   offset = { x: random(), y: random() };
+  // El sol nuevo aparece en su sitio, quieto.
+  Object.assign(hole, { x: offset.x, y: offset.y, vx: 0, vy: 0 });
   scene.add(sun.object);
 }
 newSun();
 
-// La luz sigue al ratón o al dedo (de lado a lado: -1 a 1), sin prisa.
+// Dónde está el cursor en el recuadro (de -1 a 1 en cada eje; arriba, 1), o null si no
+// está encima. El agujero lo sigue con su muelle, y la luz, con su lado a lado (pointerX).
 let pointerX = 0;
+let pointer = null;
 canvas.addEventListener('pointermove', (e) => {
   const rect = canvas.getBoundingClientRect();
   pointerX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer = { x: pointerX, y: 1 - ((e.clientY - rect.top) / rect.height) * 2 };
+});
+canvas.addEventListener('pointerleave', () => {
+  pointer = null;
 });
 
 // Doble clic o doble toque: un sol nuevo. Lo detectamos a mano (dos toques en menos de
@@ -115,7 +136,16 @@ renderer.setAnimationLoop((now) => {
   time += dt;
   angle += spinAt(time) * dt;
   light += (LIGHT - pointerX * LIGHT_REACH - light) * Math.min(1, dt / LIGHT_EASE);
-  sun.object.position.set(offset.x * half.width, offset.y * half.height, 0);
+  // El agujero: el muelle tira de él hacia su objetivo (un trozo del camino hacia el
+  // cursor, o su sitio si no hay cursor) y el rozamiento lo frena.
+  const goal = pointer ? { x: offset.x + (pointer.x - offset.x) * FOLLOW, y: offset.y + (pointer.y - offset.y) * FOLLOW } : offset;
+  for (const axis of ['x', 'y']) {
+    const target = Math.max(-ROAM, Math.min(ROAM, goal[axis]));
+    const v = `v${axis}`;
+    hole[v] += (PULL * (target - hole[axis]) - DRAG * hole[v]) * dt;
+    hole[axis] += hole[v] * dt;
+  }
+  sun.object.position.set(hole.x * half.width, hole.y * half.height, 0);
   sun.update(angle, light);
   renderer.render(scene, camera);
 });
