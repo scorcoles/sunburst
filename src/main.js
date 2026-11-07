@@ -19,7 +19,7 @@
 // «wire», siempre el último, para ver cómo está hecho: contornos, guías y los números, en
 // gris y negro. (Hubo un quinto, «dots», que ahora es un experimento aparte: gravity.)
 //
-// El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
+// El agujero aparece abajo a la derecha (en el túnel, centrado y bajo) y sigue al cursor, pero con pereza: tarda
 // en arrancar, no llega del todo y, si el cursor se va, se queda donde esté. Con el ratón
 // pulsado o el dedo puesto, todo se acerca: un zoom con el centro en el agujero; al soltar,
 // vuelve. Con doble clic o doble toque, sale un sol nuevo (otro sitio, otros destellos).
@@ -38,8 +38,18 @@ const BACKGROUND = '#0d0d0d';
 // sale siempre del mismo tamaño en proporción, sea la pantalla que sea.
 const FILL = 0.7;
 
-// Hasta dónde se aleja el agujero del centro, en partes de medio recuadro (1 = el borde).
-const OFFSET = 0.55;
+// Dónde aparece el agujero, en partes de medio recuadro (1 = el borde; arriba, 1): en los
+// modos de rayos, abajo a la derecha, como en la portada del libro (con un poco de azar,
+// JITTER); en el túnel, centrado y a tres cuartos de la altura (bajo, mirando hacia
+// arriba, por donde se pierden los anillos).
+const SPOTS = { rays: { x: 0.5, y: -0.45 }, tunnel: { x: 0, y: -0.5 } };
+const JITTER = 0.08;
+const spotFor = (name) => {
+  const spot = SPOTS[name === 'tunnel' ? 'tunnel' : 'rays'];
+  if (name === 'tunnel') return { ...spot };
+  const random = () => (Math.random() * 2 - 1) * JITTER;
+  return { x: spot.x + random(), y: spot.y + random() };
+};
 
 // El giro, en radianes por segundo, y su respiración: acelera y frena un poco, con dos
 // ondas lentas de distinta duración, para que no se repita igual.
@@ -149,19 +159,22 @@ if (notes) {
   notes.innerHTML = rows.map((row) => `<div>${row}</div>`).join('');
 }
 
-// El sol: sus rayos y, al azar, dónde está su agujero.
+// El sol: sus rayos y dónde está su agujero (SPOTS).
 let sun = null;
 let offset = { x: 0, y: 0 };
 // Dónde está el agujero ahora y a qué velocidad va (en partes de medio recuadro).
 const hole = { x: 0, y: 0, vx: 0, vy: 0 };
+// Al pasar de los rayos al túnel (o al revés), el agujero se va solo a su sitio nuevo:
+// adónde va, mientras no ha llegado.
+let place = null;
 function newSun() {
   if (sun) {
     scene.remove(sun.object);
     sun.dispose();
   }
   sun = createRays({ background: BACKGROUND });
-  const random = () => (Math.random() * 2 - 1) * OFFSET;
-  offset = { x: random(), y: random() };
+  offset = spotFor(mode);
+  place = null;
   // El sol nuevo aparece en su sitio, quieto, y en el modo que esté puesto.
   Object.assign(hole, { x: offset.x, y: offset.y, vx: 0, vy: 0 });
   scene.add(sun.object);
@@ -233,10 +246,22 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 });
 
+let opened = false;
 // Cambiar de modo: el metal, y la dirección (sin llenar el historial).
 function setMode(name) {
   name = OLD_NAMES[name] ?? name;
+  const before = mode;
   mode = MODES.includes(name) ? name : MODES[0];
+  if ((before === 'tunnel') !== (mode === 'tunnel')) {
+    // Al abrir la página, aparece ya ahí; si no, se desliza.
+    if (opened) {
+      place = spotFor(mode);
+      offset = { ...place };
+    } else {
+      offset = spotFor(mode);
+      Object.assign(hole, { x: offset.x, y: offset.y, vx: 0, vy: 0 });
+    }
+  }
   showMode();
   const hash = mode === MODES[0] ? '' : `#${mode}`;
   if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
@@ -253,6 +278,7 @@ window.addEventListener('keydown', (e) => {
 const fromHash = () => setMode(decodeURIComponent(location.hash.slice(1)));
 window.addEventListener('hashchange', fromHash);
 fromHash();
+opened = true;
 
 // El sonido, con el altavoz de arriba a la derecha: apagado hasta que se pulsa.
 const sound = createSound();
@@ -284,7 +310,8 @@ renderer.setAnimationLoop((now) => {
   // El agujero: el muelle tira de él hacia su objetivo (un trozo del camino hacia el
   // cursor) y el rozamiento lo frena. Sin cursor, nada tira de él: frena y se queda donde
   // esté, y ese es su sitio nuevo (desde donde seguirá al cursor cuando vuelva).
-  if (!pointer) offset = { x: hole.x, y: hole.y };
+  if (place && Math.hypot(hole.x - place.x, hole.y - place.y) < 0.01) place = null;
+  if (!pointer) offset = place ? { ...place } : { x: hole.x, y: hole.y };
   const follow = touch ? TOUCH.follow : FOLLOW;
   const pull = touch ? TOUCH.pull : PULL;
   const drag = touch ? TOUCH.drag : DRAG;
