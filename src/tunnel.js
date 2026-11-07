@@ -5,7 +5,8 @@
 // Anillos negros y blancos, uno dentro de otro, pero no concéntricos: cada uno tiene el
 // centro un poco más cerca del agujero que el anterior, y eso dibuja un embudo en
 // perspectiva, un túnel. Los anillos fluyen hacia dentro, como tragados. Encima, el
-// desgaste de una impresión vieja: motas blancas en el negro, fijas en el papel.
+// desgaste de una impresión vieja: motas blancas en el negro, fijas en el papel, que con
+// el zoom se quedan casi quietas, como un fondo estrellado a lo lejos.
 //
 // Todo lo pinta un shader sobre un rectángulo que llena el recuadro. Los anillos son una
 // familia de círculos: el de «t = 0» es el agujero y el de «t = 1» el borde de fuera; entre
@@ -26,6 +27,9 @@ const RINGS = 23.6;
 const FLOW = 0.35;
 // Lo fino que es el grano de las motas blancas (más = motas más pequeñas).
 const GRAIN = 150;
+// Cuánto se acerca el grano con el zoom (0 = nada, quieto como estrellas al fondo; 1 = como
+// el túnel).
+const STARS_DEPTH = 0.06;
 // La perspectiva del embudo: cuánto se va el centro del borde de fuera al lado contrario
 // del agujero (en proporción a lo que se aleja el agujero del centro) y cuánto sube (en
 // partes de medio recuadro).
@@ -100,8 +104,9 @@ export function createTunnel({ paper, ink }) {
         // El desgaste, fijo en el papel: solo en el negro, motas blancas, como tinta que no
         // ha llegado a agarrar. El blanco queda limpio. (Y fuera del agujero: dentro, negro
         // limpio.)
-        // (Con el zoom, el grano también se acerca: va pegado al dibujo.)
-        vec2 uv = hole + (vWorld - hole) / zoom;
+        // El grano es como un fondo estrellado muy lejos: con el zoom casi no se acerca (un
+        // pelo, STARS_DEPTH, para que se note que está detrás), mientras el túnel sí.
+        vec2 uv = hole + (vWorld - hole) / (1.0 + (zoom - 1.0) * ${STARS_DEPTH.toFixed(2)});
         // (GRAIN: lo fino que es el grano; más = motas más pequeñas.)
         float specks = step(0.88, noise(uv * ${GRAIN.toFixed(1)} + 11.0)) * step(0.66, noise(uv * 3.5 + 7.0));
         float outside = step(0.0, C);
