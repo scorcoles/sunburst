@@ -10,12 +10,6 @@
   --side: 1rem;
 }
 
-/* En el modo dots, toda la página del rosa del recuadro, y lo que era blanco, en negro. */
-html[data-mode='dots'] {
-  --ink: #0d0d0d;
-  --black: #ef5a86;
-}
-
 html,
 body {
   margin: 0;
@@ -179,48 +173,6 @@ body {
 
 .foot__sep {
   margin: 0 0.6em;
-}
-
-/* En el modo dots, el pie no va entre dos líneas: es un bloque negro macizo, con la letra
-   del rosa de la página, y el nombre al revés (rosa, con la letra negra). */
-html[data-mode='dots'] .foot {
-  border: 0;
-  background: var(--ink);
-  color: var(--black);
-}
-
-html[data-mode='dots'] .foot p {
-  padding: 0.6rem 0.75rem;
-}
-
-html[data-mode='dots'] .foot__tag {
-  background: var(--black);
-  color: var(--ink);
-}
-
-/* Y en el modo dots, los puntos ocupan toda la pantalla: el recuadro llena la ventana, por
-   debajo de la cabecera, del pie y de los lados; encima quedan solo el símbolo, los botones
-   y el bloque del pie. (La cabecera deja pasar el ratón y el dedo a los puntos, salvo en
-   el símbolo y los botones.) */
-html[data-mode='dots'] .panel {
-  position: fixed;
-  inset: 0;
-  margin: 0;
-}
-
-html[data-mode='dots'] .top,
-html[data-mode='dots'] .foot {
-  position: relative;
-  z-index: 1;
-}
-
-html[data-mode='dots'] .top {
-  pointer-events: none;
-}
-
-html[data-mode='dots'] .top a,
-html[data-mode='dots'] .tools {
-  pointer-events: auto;
 }
 
 /* Prev y Next: botones que parecen texto del pie (como en vortik y vertikis). */

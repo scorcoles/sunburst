@@ -4,7 +4,7 @@
 //
 // Como en vortik y vertikis: el botón de arriba a la derecha abre el menú de compartir del
 // sistema con una foto del momento. La foto es un cartel pequeño: el recuadro tal cual, con
-// un marco del color de la página (negro; rosa en dots) y, abajo, «SUNBURST · VERTIK.NET».
+// un marco negro y, abajo, «SUNBURST · VERTIK.NET».
 // Donde no se puede compartir una imagen (Firefox de escritorio, por ejemplo), el botón no
 // aparece.
 //

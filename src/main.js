@@ -8,17 +8,16 @@
 //
 //   rays.js  → las bandas, su metal (un shader) y el agujero
 //   tunnel.js → el modo túnel: anillos que caen hacia el agujero (otro shader)
-//   dots.js   → el modo dots: un pozo de gravedad de puntos negros sobre rosa
 //   sound.js  → el sonido (el de vortik, adaptado: el agujero cambia el grave)
 //   share.js  → compartir una foto del cartel
 //   main.js  → el escenario, el giro, la luz, el doble toque y los modos (este archivo)
 //
-// Cinco modos, con «Prev» y «Next» en el pie, las flechas del teclado o la dirección
-// (#flat, #tunnel, #dots, #wire): «folds», cada tramo del zigzag una faceta que destella
-// por su cuenta; «flat», todas las bandas recortadas de una sola lámina de metal; «tunnel»,
-// sin rayos: anillos blancos y negros que caen hacia el agujero, con motas como estrellas;
-// «dots», un pozo de gravedad de puntos negros sobre rosa; y «wire», siempre el
-// último, para ver cómo está hecho: contornos, guías y los números, en gris y negro.
+// Cuatro modos, con «Prev» y «Next» en el pie, las flechas del teclado o la dirección
+// (#flat, #tunnel, #wire): «folds», cada tramo del zigzag una faceta que destella por su
+// cuenta; «flat», todas las bandas recortadas de una sola lámina de metal; «tunnel», sin
+// rayos: anillos blancos y negros que caen hacia el agujero, con motas como estrellas; y
+// «wire», siempre el último, para ver cómo está hecho: contornos, guías y los números, en
+// gris y negro. (Hubo un quinto, «dots», que ahora es un experimento aparte: gravity.)
 //
 // El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
 // en arrancar, no llega del todo y, si el cursor se va, se queda donde esté. Con el ratón
@@ -29,7 +28,6 @@
 import * as THREE from 'three';
 import { createRays, INFO, WIRE_PAPER } from './rays.js';
 import { createTunnel } from './tunnel.js';
-import { createDots, DOTS_TILT } from './dots.js';
 import { createSound } from './sound.js';
 import { setupShare } from './share.js';
 import '../style.css';
@@ -76,14 +74,6 @@ const ZOOM_BACK = 0.35;
 // botón de compartir. Y con el ratón encima de los botones de arriba, no vuelve.
 const ZOOM_HOLD = 1.5;
 
-// En el modo dots, la estela del cursor: lo deprisa que tiene que ir (recuadros por
-// segundo), cada cuánto deja una onda (segundos) y su fuerza (la de un toque es 1).
-const WAKE_SPEED = 0.3;
-const WAKE_GAP = 0.25;
-const WAKE_STRENGTH = 0.12;
-let lastWake = 0;
-// Cuánto sube el pozo del modo dots respecto al agujero (en partes de medio recuadro).
-const DOTS_LIFT = 0.3;
 
 // La luz: hacia dónde está (radianes), cuánto la mueve el ratón (de un lado al otro del
 // recuadro) y lo que tarda en seguirlo (segundos).
@@ -123,7 +113,7 @@ resize();
 
 // Los modos, en orden. El primero es el de siempre (sin # en la dirección).
 // «wire», siempre el último. (Los nombres de antes, en castellano, siguen valiendo.)
-const MODES = ['folds', 'flat', 'tunnel', 'dots', 'wire'];
+const MODES = ['folds', 'flat', 'tunnel', 'wire'];
 const OLD_NAMES = { pliegues: 'folds', plano: 'flat', tunel: 'tunnel' };
 let mode = MODES[0];
 
@@ -135,19 +125,11 @@ scene.add(tunnel.object);
 // Lo que se ve en cada modo: el túnel, o los rayos con su metal.
 // En wire, además, el papel gris claro de fondo y la ficha con los números.
 const notes = document.querySelector('[data-notes]');
-// El rosa del modo dots.
-const PINK = '#ef5a86';
-const dots = createDots({ ink: BACKGROUND });
-scene.add(dots.object);
-
 function showMode() {
   tunnel.object.visible = mode === 'tunnel';
-  dots.object.visible = mode === 'dots';
-  sun.object.visible = mode !== 'tunnel' && mode !== 'dots';
+  sun.object.visible = mode !== 'tunnel';
   sun.setLook(mode);
-  renderer.setClearColor(mode === 'wire' ? WIRE_PAPER : mode === 'dots' ? PINK : BACKGROUND);
-  // El modo, en <html>: en dots, style.css pone toda la página en rosa y la letra en negro.
-  document.documentElement.dataset.mode = mode;
+  renderer.setClearColor(mode === 'wire' ? WIRE_PAPER : BACKGROUND);
   if (notes) notes.hidden = mode !== 'wire';
 }
 
@@ -178,8 +160,6 @@ function newSun() {
   sun = createRays({ background: BACKGROUND });
   const random = () => (Math.random() * 2 - 1) * OFFSET;
   offset = { x: random(), y: random() };
-  // Y un paisaje nuevo para el modo dots.
-  dots.regenerate();
   // El sol nuevo aparece en su sitio, quieto, y en el modo que esté puesto.
   Object.assign(hole, { x: offset.x, y: offset.y, vx: 0, vy: 0 });
   scene.add(sun.object);
@@ -220,14 +200,6 @@ let releasedAt = -Infinity;
 let overTools = false;
 canvas.addEventListener('pointerdown', (e) => {
   if (e.isPrimary) pressed = true;
-  // En el modo dots, cada toque lanza una onda desde donde cae.
-  // Y suena a impacto.
-  if (mode === 'dots') {
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    dots.ripple(x, 1 - ((e.clientY - rect.top) / rect.height) * 2, camera);
-    sound.impact(x);
-  }
 });
 for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
   canvas.addEventListener(type, () => {
@@ -291,9 +263,7 @@ soundButton?.addEventListener('click', () => {
 });
 
 // Compartir: una foto del cartel. El marco, del negro del fondo; el texto, del blanco.
-setupShare(canvas, () => renderer.render(scene, camera), () =>
-  mode === 'dots' ? { background: PINK, ink: BACKGROUND } : { background: BACKGROUND, ink: '#ece8df' },
-);
+setupShare(canvas, () => renderer.render(scene, camera), () => ({ background: BACKGROUND, ink: '#ece8df' }));
 
 // Cada fotograma: gira, la luz se acerca a donde apunta el ratón, y se pinta.
 let time = 0;
@@ -327,12 +297,6 @@ renderer.setAnimationLoop((now) => {
   const clampLean = (v) => Math.max(-LEAN_MAX, Math.min(LEAN_MAX, v));
   sun.object.rotation.set(clampLean(-hole.vy * LEAN), clampLean(hole.vx * LEAN), 0);
   tunnel.object.rotation.copy(sun.object.rotation);
-  // Los puntos: en el agujero, vistos en ángulo (DOTS_TILT) y con la misma inclinación.
-  // (Un poco más arriba que el agujero de los otros modos: la garganta del pozo cuelga por
-  // debajo y, si no, el pie la taparía.)
-  dots.object.position.copy(sun.object.position);
-  dots.object.position.y += half.height * DOTS_LIFT;
-  dots.object.rotation.set(DOTS_TILT + sun.object.rotation.x, sun.object.rotation.y, 0);
   // El zoom: pulsado, se acerca a ritmo constante; suelto, vuelve, deprisa al principio.
   // Los rayos (con su agujero y las guías del wire) se agrandan desde el agujero, que es
   // donde está su centro.
@@ -341,15 +305,6 @@ renderer.setAnimationLoop((now) => {
   if (pressed) zoom = Math.min(ZOOM_MAX, zoom + ZOOM * dt);
   else if (!holding) zoom += (1 - zoom) * Math.min(1, dt / ZOOM_BACK);
   sun.object.scale.setScalar(zoom);
-  dots.object.scale.setScalar(zoom);
-  dots.update(dt, angle, renderer.getPixelRatio(), camera.position.z);
-  // El bulto del terreno sigue al cursor (o se va, si no hay cursor).
-  if (mode === 'dots') dots.setCursor(pointer ? pointer.x : null, pointer ? pointer.y : null, camera);
-  // Y al pasar, deja una estela de ondas pequeñas (una cada WAKE_GAP segundos, si se mueve).
-  if (mode === 'dots' && pointer && pointerSpeed > WAKE_SPEED && time - lastWake > WAKE_GAP) {
-    lastWake = time;
-    dots.ripple(pointer.x, pointer.y, camera, WAKE_STRENGTH);
-  }
   sun.update(angle, light);
   tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight));
   // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
