@@ -70,6 +70,9 @@ const LEAN_MAX = 0.4;
 const ZOOM = 0.9;
 const ZOOM_MAX = 5;
 const ZOOM_BACK = 0.35;
+// Al soltar, el zoom espera un momento antes de volver (segundos): da tiempo a llegar al
+// botón de compartir. Y con el ratón encima de los botones de arriba, no vuelve.
+const ZOOM_HOLD = 1.5;
 
 // La luz: hacia dónde está (radianes), cuánto la mueve el ratón (de un lado al otro del
 // recuadro) y lo que tarda en seguirlo (segundos).
@@ -191,14 +194,25 @@ canvas.addEventListener('pointerleave', () => {
 
 // Mientras se mantiene pulsado (el ratón o el dedo, dentro del recuadro), todo se acerca.
 let pressed = false;
+// Cuándo se soltó (en el reloj de la página), y si el ratón está sobre los botones.
+let releasedAt = -Infinity;
+let overTools = false;
 canvas.addEventListener('pointerdown', (e) => {
   if (e.isPrimary) pressed = true;
 });
 for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
   canvas.addEventListener(type, () => {
+    if (pressed) releasedAt = performance.now();
     pressed = false;
   });
 }
+const tools = document.querySelector('.tools');
+tools?.addEventListener('pointerenter', () => {
+  overTools = true;
+});
+tools?.addEventListener('pointerleave', () => {
+  overTools = false;
+});
 let zoom = 1;
 
 // Doble clic o doble toque: un sol nuevo. Lo detectamos a mano (dos toques en menos de
@@ -285,7 +299,10 @@ renderer.setAnimationLoop((now) => {
   // El zoom: pulsado, se acerca a ritmo constante; suelto, vuelve, deprisa al principio.
   // Los rayos (con su agujero y las guías del wire) se agrandan desde el agujero, que es
   // donde está su centro.
-  zoom = pressed ? Math.min(ZOOM_MAX, zoom + ZOOM * dt) : zoom + (1 - zoom) * Math.min(1, dt / ZOOM_BACK);
+  // (Recién soltado, o con el ratón en los botones, se queda como está: para compartirlo.)
+  const holding = overTools || (now - releasedAt) / 1000 < ZOOM_HOLD;
+  if (pressed) zoom = Math.min(ZOOM_MAX, zoom + ZOOM * dt);
+  else if (!holding) zoom += (1 - zoom) * Math.min(1, dt / ZOOM_BACK);
   sun.object.scale.setScalar(zoom);
   sun.update(angle, light);
   tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight));
