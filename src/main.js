@@ -8,16 +8,17 @@
 //
 //   rays.js  → las bandas, su metal (un shader) y el agujero
 //   tunnel.js → el modo túnel: anillos que caen hacia el agujero (otro shader)
+//   dots.js   → el modo dots: el embudo dibujado con puntos negros sobre rosa
 //   sound.js  → el sonido (el de vortik, adaptado: el agujero cambia el grave)
 //   share.js  → compartir una foto del cartel
 //   main.js  → el escenario, el giro, la luz, el doble toque y los modos (este archivo)
 //
-// Cuatro modos, con «Prev» y «Next» en el pie, las flechas del teclado o la dirección
-// (#flat, #tunnel, #wire): «folds», cada tramo del zigzag una faceta que destella por su
-// cuenta; «flat», todas las bandas recortadas de una sola lámina de metal; «tunnel», sin
-// rayos: anillos blancos y negros que caen hacia el agujero, con el desgaste de una
-// impresión vieja; y «wire», siempre el último, para ver cómo está hecho: contornos, guías
-// y los números, en gris y negro.
+// Cinco modos, con «Prev» y «Next» en el pie, las flechas del teclado o la dirección
+// (#flat, #tunnel, #dots, #wire): «folds», cada tramo del zigzag una faceta que destella
+// por su cuenta; «flat», todas las bandas recortadas de una sola lámina de metal; «tunnel»,
+// sin rayos: anillos blancos y negros que caen hacia el agujero, con motas como estrellas;
+// «dots», el embudo en 3D dibujado con puntos negros sobre rosa; y «wire», siempre el
+// último, para ver cómo está hecho: contornos, guías y los números, en gris y negro.
 //
 // El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
 // en arrancar, no llega del todo y, si el cursor se va, se queda donde esté. Con el ratón
@@ -28,6 +29,7 @@
 import * as THREE from 'three';
 import { createRays, INFO, WIRE_PAPER } from './rays.js';
 import { createTunnel } from './tunnel.js';
+import { createDots, DOTS_TILT } from './dots.js';
 import { createSound } from './sound.js';
 import { setupShare } from './share.js';
 import '../style.css';
@@ -112,7 +114,7 @@ resize();
 
 // Los modos, en orden. El primero es el de siempre (sin # en la dirección).
 // «wire», siempre el último. (Los nombres de antes, en castellano, siguen valiendo.)
-const MODES = ['folds', 'flat', 'tunnel', 'wire'];
+const MODES = ['folds', 'flat', 'tunnel', 'dots', 'wire'];
 const OLD_NAMES = { pliegues: 'folds', plano: 'flat', tunel: 'tunnel' };
 let mode = MODES[0];
 
@@ -124,11 +126,17 @@ scene.add(tunnel.object);
 // Lo que se ve en cada modo: el túnel, o los rayos con su metal.
 // En wire, además, el papel gris claro de fondo y la ficha con los números.
 const notes = document.querySelector('[data-notes]');
+// El rosa del modo dots.
+const PINK = '#ef5a86';
+const dots = createDots({ ink: BACKGROUND });
+scene.add(dots.object);
+
 function showMode() {
   tunnel.object.visible = mode === 'tunnel';
-  sun.object.visible = mode !== 'tunnel';
+  dots.object.visible = mode === 'dots';
+  sun.object.visible = mode !== 'tunnel' && mode !== 'dots';
   sun.setLook(mode);
-  renderer.setClearColor(mode === 'wire' ? WIRE_PAPER : BACKGROUND);
+  renderer.setClearColor(mode === 'wire' ? WIRE_PAPER : mode === 'dots' ? PINK : BACKGROUND);
   if (notes) notes.hidden = mode !== 'wire';
 }
 
@@ -296,6 +304,9 @@ renderer.setAnimationLoop((now) => {
   const clampLean = (v) => Math.max(-LEAN_MAX, Math.min(LEAN_MAX, v));
   sun.object.rotation.set(clampLean(-hole.vy * LEAN), clampLean(hole.vx * LEAN), 0);
   tunnel.object.rotation.copy(sun.object.rotation);
+  // Los puntos: en el agujero, vistos en ángulo (DOTS_TILT) y con la misma inclinación.
+  dots.object.position.copy(sun.object.position);
+  dots.object.rotation.set(DOTS_TILT + sun.object.rotation.x, sun.object.rotation.y, 0);
   // El zoom: pulsado, se acerca a ritmo constante; suelto, vuelve, deprisa al principio.
   // Los rayos (con su agujero y las guías del wire) se agrandan desde el agujero, que es
   // donde está su centro.
@@ -304,6 +315,8 @@ renderer.setAnimationLoop((now) => {
   if (pressed) zoom = Math.min(ZOOM_MAX, zoom + ZOOM * dt);
   else if (!holding) zoom += (1 - zoom) * Math.min(1, dt / ZOOM_BACK);
   sun.object.scale.setScalar(zoom);
+  dots.object.scale.setScalar(zoom);
+  dots.update(dt, angle, renderer.getPixelRatio(), camera.position.z);
   sun.update(angle, light);
   tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight));
   // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
