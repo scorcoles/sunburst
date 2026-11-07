@@ -1,0 +1,19 @@
+{
+  "name": "sunburst",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Un sol de rayos metálicos que gira alrededor de un agujero. Un experimento de VERTIK, en homenaje a la portada de Death in Space.",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.6"
+  },
+  "license": "MIT"
+}
