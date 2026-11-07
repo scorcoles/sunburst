@@ -172,10 +172,15 @@ body {
   margin: 0 0.6em;
 }
 
-/* Prev y Next: botones que parecen texto del pie. */
+/* Prev y Next: botones que parecen texto del pie (como en vortik y vertikis). */
+.foot__modes {
+  white-space: nowrap;
+}
+
 .foot__modes button {
-  margin: 0;
-  padding: 0;
+  /* Más zona para el dedo que lo que se ve. */
+  margin: -8px 0;
+  padding: 8px 0;
   border: 0;
   background: none;
   color: inherit;
@@ -197,5 +202,37 @@ body {
 
   .top {
     height: 4rem;
+  }
+}
+
+/* En el móvil (y en pantallas táctiles), como en vortik y vertikis: «Prev» y «Next» en su
+   propia línea, a todo el ancho (uno a cada lado), con más aire para el dedo; el «·» que
+   los separaba del resto sobra. */
+@media (max-width: 63.99rem), (pointer: coarse) {
+  .foot__modes {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+  }
+
+  .foot__modes .foot__sep {
+    display: none;
+  }
+
+  .foot__modes button {
+    margin: -10px 0;
+    padding: 10px 6px;
+  }
+
+  .foot__modes button:first-child {
+    margin-left: -6px;
+  }
+
+  .foot__modes button:last-child {
+    margin-right: -6px;
+  }
+
+  .foot__sep:has(+ wbr + .foot__modes) {
+    display: none;
   }
 }
