@@ -16,6 +16,11 @@
 // inclinación, como un papel metalizado doblado: cada una destella en un momento distinto
 // del giro. Encima, un cepillado finísimo (rayitas a lo largo de la banda) y un punto
 // irisado en los brillos.
+//
+// Eso es el modo «pliegues». En el modo «plano», sin facetas ni torneado: todas las bandas
+// están recortadas de UNA lámina de metal plana. La luz es un degradado que cruza la
+// pantalla en línea recta, con su arcoíris, y la lámina gira por debajo: las bandas entran
+// y salen del brillo todas a la vez, como un solo plano.
 
 import * as THREE from 'three';
 
@@ -99,6 +104,8 @@ export function createRays({ background }) {
     paint: { value: new THREE.Color('#ece8df') },
     center: { value: new THREE.Vector2() },
     light: { value: 0.8 },
+    // 1 = pliegues (cada tramo, una faceta); 0 = plano (una sola lámina).
+    folds: { value: 1 },
   };
   const material = new THREE.ShaderMaterial({
     uniforms,
@@ -122,6 +129,7 @@ export function createRays({ background }) {
       uniform vec3 paint;
       uniform vec2 center;
       uniform float light;
+      uniform float folds;
       varying vec3 vWorld;
       varying vec2 vLocal;
       varying float vFacet;
@@ -150,9 +158,22 @@ export function createRays({ background }) {
         // El punto irisado: un arcoíris que cambia con el ángulo y la distancia, solo en
         // los brillos.
         vec3 rainbow = 0.5 + 0.5 * cos(6.2831 * (screen / 3.1416 + r * 0.25 + vec3(0.0, 0.33, 0.67)));
-        vec3 color = paint * shade;
-        color = mix(color, rainbow * (shade + 0.2), 0.35 * clamp(sheen + glint, 0.0, 1.0));
-        gl_FragColor = vec4(color, 1.0);
+        vec3 folded = paint * shade;
+        folded = mix(folded, rainbow * (shade + 0.2), 0.35 * clamp(sheen + glint, 0.0, 1.0));
+
+        // El plano: «along», dónde está el punto a lo largo de la dirección de la luz, en
+        // la pantalla (en línea recta, no alrededor del agujero). El brillo, una franja
+        // ancha y suave que cruza la pantalla; el arcoíris, bandas paralelas a ella. El
+        // cepillado, rayitas rectas y paralelas sobre la lámina (giran con ella).
+        vec2 toward = vec2(cos(light), sin(light));
+        float along = dot(vWorld.xy, toward);
+        float flatSheen = pow(0.5 + 0.5 * cos(along * 1.4), 5.0);
+        float flatBrush = hash(floor(vLocal.x * 260.0)) - 0.5;
+        float flatShade = 0.34 + 0.62 * flatSheen + 0.07 * flatBrush;
+        vec3 flatRainbow = 0.5 + 0.5 * cos(6.2831 * (along * 0.3 + vec3(0.0, 0.33, 0.67)));
+        vec3 plane = mix(paint * flatShade, flatRainbow * (flatShade + 0.15), 0.25 + 0.3 * flatSheen);
+
+        gl_FragColor = vec4(mix(plane, folded, folds), 1.0);
         #include <colorspace_fragment>
       }
     `,
@@ -186,5 +207,15 @@ export function createRays({ background }) {
     hole.material.dispose();
   }
 
-  return { object, update, dispose };
+  // El tamaño del agujero (1 = el de siempre): crece mientras se mantiene pulsado.
+  function setHoleSize(size) {
+    hole.scale.setScalar(size);
+  }
+
+  // El modo: true, pliegues; false, plano.
+  function setFolds(on) {
+    uniforms.folds.value = on ? 1 : 0;
+  }
+
+  return { object, update, setFolds, setHoleSize, dispose };
 }

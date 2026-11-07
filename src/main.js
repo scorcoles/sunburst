@@ -7,10 +7,15 @@
 // rayos; abajo, el pie entre dos líneas.
 //
 //   rays.js  → las bandas, su metal (un shader) y el agujero
-//   main.js  → el escenario, el giro, la luz y el doble toque (este archivo)
+//   main.js  → el escenario, el giro, la luz, el doble toque y los modos (este archivo)
+//
+// Dos modos, con «Prev» y «Next» en el pie, las flechas del teclado o la dirección
+// (#plano): «pliegues», cada tramo del zigzag una faceta que destella por su cuenta; y
+// «plano», todas las bandas recortadas de una sola lámina de metal.
 //
 // El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
-// en arrancar, no llega del todo y, si el cursor se va, vuelve a su sitio. Con doble clic o
+// en arrancar, no llega del todo y, si el cursor se va, vuelve a su sitio. Con el ratón
+// pulsado o el dedo puesto, crece (se traga los rayos); al soltar, vuelve a su tamaño. Con doble clic o
 // doble toque, sale un sol nuevo (otro sitio, otros destellos). Mover el ratón o el dedo
 // también mueve la luz.
 
@@ -41,6 +46,12 @@ const FOLLOW = 0.6;
 const PULL = 4;
 const DRAG = 4.4;
 const ROAM = 0.85;
+
+// El agujero que crece: cuánto por segundo mientras se mantiene pulsado (1 = su tamaño
+// cada segundo), hasta cuánto (veces su tamaño) y lo que tarda en volver al soltar (s).
+const GROW = 0.9;
+const GROW_MAX = 5;
+const SHRINK = 0.35;
 
 // La luz: hacia dónde está (radianes), cuánto la mueve el ratón (de un lado al otro del
 // recuadro) y lo que tarda en seguirlo (segundos).
@@ -77,6 +88,10 @@ function resize() {
 new ResizeObserver(resize).observe(canvas);
 resize();
 
+// Los modos, en orden. El primero es el de siempre (sin # en la dirección).
+const MODES = ['pliegues', 'plano'];
+let mode = MODES[0];
+
 // El sol: sus rayos y, al azar, dónde está su agujero.
 let sun = null;
 let offset = { x: 0, y: 0 };
@@ -90,8 +105,9 @@ function newSun() {
   sun = createRays({ background: BACKGROUND });
   const random = () => (Math.random() * 2 - 1) * OFFSET;
   offset = { x: random(), y: random() };
-  // El sol nuevo aparece en su sitio, quieto.
+  // El sol nuevo aparece en su sitio, quieto, y en el modo que esté puesto.
   Object.assign(hole, { x: offset.x, y: offset.y, vx: 0, vy: 0 });
+  sun.setFolds(mode === 'pliegues');
   scene.add(sun.object);
 }
 newSun();
@@ -109,6 +125,18 @@ canvas.addEventListener('pointerleave', () => {
   pointer = null;
 });
 
+// Mientras se mantiene pulsado (el ratón o el dedo, dentro del recuadro), el agujero crece.
+let pressed = false;
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.isPrimary) pressed = true;
+});
+for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
+  canvas.addEventListener(type, () => {
+    pressed = false;
+  });
+}
+let holeSize = 1;
+
 // Doble clic o doble toque: un sol nuevo. Lo detectamos a mano (dos toques en menos de
 // 300 ms y a menos de 30 px): en el móvil, el «dblclick» del navegador no llega siempre.
 let lastTap = { time: 0, x: 0, y: 0 };
@@ -123,6 +151,26 @@ canvas.addEventListener('pointerdown', (e) => {
     lastTap = { time: now, x: e.clientX, y: e.clientY };
   }
 });
+
+// Cambiar de modo: el metal, y la dirección (sin llenar el historial).
+function setMode(name) {
+  mode = MODES.includes(name) ? name : MODES[0];
+  sun.setFolds(mode === 'pliegues');
+  const hash = mode === MODES[0] ? '' : `#${mode}`;
+  if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
+}
+const stepMode = (by) => setMode(MODES[(MODES.indexOf(mode) + by + MODES.length) % MODES.length]);
+document.querySelector('[data-mode-prev]')?.addEventListener('click', () => stepMode(-1));
+document.querySelector('[data-mode-next]')?.addEventListener('click', () => stepMode(1));
+window.addEventListener('keydown', (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  stepMode(e.key === 'ArrowLeft' ? -1 : 1);
+});
+const fromHash = () => setMode(decodeURIComponent(location.hash.slice(1)));
+window.addEventListener('hashchange', fromHash);
+fromHash();
 
 // Cada fotograma: gira, la luz se acerca a donde apunta el ratón, y se pinta.
 let time = 0;
@@ -146,6 +194,9 @@ renderer.setAnimationLoop((now) => {
     hole[axis] += hole[v] * dt;
   }
   sun.object.position.set(hole.x * half.width, hole.y * half.height, 0);
+  // Pulsado, crece a ritmo constante; suelto, vuelve a su tamaño, deprisa al principio.
+  holeSize = pressed ? Math.min(GROW_MAX, holeSize + GROW * dt) : holeSize + (1 - holeSize) * Math.min(1, dt / SHRINK);
+  sun.setHoleSize(holeSize);
   sun.update(angle, light);
   renderer.render(scene, camera);
 });

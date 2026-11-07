@@ -7,6 +7,8 @@ Demo: [scorcoles.github.io/sunburst](https://scorcoles.github.io/sunburst/) · E
 - Todo es un plano, como un cartel: arriba el símbolo; en medio, los rayos; abajo, el pie entre dos líneas.
 - 28 bandas que salen del agujero, se tuercen en espiral y se quiebran en zigzag, todas en paralelo, hasta salirse del recuadro.
 - El metal es un shader propio: una franja de brillo fija por la que pasan las bandas al girar, una faceta distinta en cada tramo del zigzag (cada una destella a su hora), un cepillado fino y un punto irisado en los brillos.
+- Dos modos (← Prev · Next → en el pie, las flechas del teclado o `#plano` en la dirección): **pliegues**, cada tramo del zigzag una faceta que destella a su hora; y **plano**, todas las bandas recortadas de una sola lámina de metal, con un brillo y un arcoíris que la cruzan en línea recta.
+- Con el ratón pulsado o el dedo puesto, el agujero crece y se traga los rayos; al soltar, vuelve a su tamaño.
 - El agujero sigue al cursor, con pereza: tarda en arrancar, no llega del todo y frena sin rebotar; si el cursor se va, vuelve a su sitio. El cursor también mueve la luz. Doble clic o doble toque: un sol nuevo, con el agujero en otro sitio.
 
 ## Cómo está hecho

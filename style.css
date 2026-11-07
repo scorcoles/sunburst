@@ -72,15 +72,37 @@ body {
   text-transform: uppercase;
 }
 
+/* El nombre, en negativo: con la altura entera de la línea (como Prev y Next), no solo la
+   de las letras. */
 .foot__tag {
+  display: inline-block;
   margin-right: 0.6em;
   padding: 0 0.4em;
+  line-height: inherit;
   background: var(--ink);
   color: var(--black);
 }
 
 .foot__sep {
   margin: 0 0.6em;
+}
+
+/* Prev y Next: botones que parecen texto del pie. */
+.foot__modes button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.foot__modes button:hover,
+.foot__modes button:focus-visible {
+  text-decoration: underline;
 }
 
 @media (max-width: 47.99rem) {
