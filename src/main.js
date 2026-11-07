@@ -54,6 +54,9 @@ const spinAt = (time) => SPIN * (1 + PULSE * (0.7 * Math.sin(0.6 * time) + 0.3 *
 const FOLLOW = 0.6;
 const PULL = 4;
 const DRAG = 4.4;
+// Con el dedo, casi sin resistencia: llega casi hasta el dedo y lo sigue enseguida (un
+// muelle mucho más fuerte, con el rozamiento justo para no rebotar).
+const TOUCH = { follow: 0.95, pull: 40, drag: 12.6 };
 const ROAM = 0.85;
 
 // Al seguir al cursor, el plano se inclina hacia donde va: cuánto por cada unidad de
@@ -168,7 +171,10 @@ let pointer = null;
 // cada movimiento y se va apagando solo.
 let pointerSpeed = 0;
 let lastMove = null;
+// Si lo que se mueve es un dedo (casi sin resistencia) o un ratón (con pereza).
+let touch = false;
 canvas.addEventListener('pointermove', (e) => {
+  touch = e.pointerType === 'touch';
   const rect = canvas.getBoundingClientRect();
   pointerX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   pointer = { x: pointerX, y: 1 - ((e.clientY - rect.top) / rect.height) * 2 };
@@ -260,11 +266,14 @@ renderer.setAnimationLoop((now) => {
   // cursor) y el rozamiento lo frena. Sin cursor, nada tira de él: frena y se queda donde
   // esté, y ese es su sitio nuevo (desde donde seguirá al cursor cuando vuelva).
   if (!pointer) offset = { x: hole.x, y: hole.y };
-  const goal = pointer ? { x: offset.x + (pointer.x - offset.x) * FOLLOW, y: offset.y + (pointer.y - offset.y) * FOLLOW } : offset;
+  const follow = touch ? TOUCH.follow : FOLLOW;
+  const pull = touch ? TOUCH.pull : PULL;
+  const drag = touch ? TOUCH.drag : DRAG;
+  const goal = pointer ? { x: offset.x + (pointer.x - offset.x) * follow, y: offset.y + (pointer.y - offset.y) * follow } : offset;
   for (const axis of ['x', 'y']) {
     const target = Math.max(-ROAM, Math.min(ROAM, goal[axis]));
     const v = `v${axis}`;
-    hole[v] += (PULL * (target - hole[axis]) - DRAG * hole[v]) * dt;
+    hole[v] += (pull * (target - hole[axis]) - drag * hole[v]) * dt;
     hole[axis] += hole[v] * dt;
   }
   sun.object.position.set(hole.x * half.width, hole.y * half.height, 0);
