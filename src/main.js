@@ -20,7 +20,7 @@
 // y los números, en gris y negro.
 //
 // El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
-// en arrancar, no llega del todo y, si el cursor se va, vuelve a su sitio. Con el ratón
+// en arrancar, no llega del todo y, si el cursor se va, se queda donde esté. Con el ratón
 // pulsado o el dedo puesto, todo se acerca: un zoom con el centro en el agujero; al soltar,
 // vuelve. Con doble clic o doble toque, sale un sol nuevo (otro sitio, otros destellos).
 // Mover el ratón o el dedo también mueve la luz.
@@ -48,7 +48,7 @@ const PULSE = 0.5;
 const spinAt = (time) => SPIN * (1 + PULSE * (0.7 * Math.sin(0.6 * time) + 0.3 * Math.sin(1.7 * time + 1)));
 
 // El agujero sigue al cursor con un muelle: FOLLOW es hasta dónde se deja llevar (1 = hasta
-// el cursor; 0,6 = un 60 % del camino desde su sitio), PULL lo fuerte que tira el muelle y
+// el cursor; 0,6 = un 60 % del camino desde donde estaba cuando llegó el cursor), PULL lo fuerte que tira el muelle y
 // DRAG el rozamiento (con este, frena sin rebotar: se nota pesado, con resistencia). Y
 // hasta dónde puede irse, en partes de medio recuadro.
 const FOLLOW = 0.6;
@@ -257,7 +257,9 @@ renderer.setAnimationLoop((now) => {
   angle += spinAt(time) * dt;
   light += (LIGHT - pointerX * LIGHT_REACH - light) * Math.min(1, dt / LIGHT_EASE);
   // El agujero: el muelle tira de él hacia su objetivo (un trozo del camino hacia el
-  // cursor, o su sitio si no hay cursor) y el rozamiento lo frena.
+  // cursor) y el rozamiento lo frena. Sin cursor, nada tira de él: frena y se queda donde
+  // esté, y ese es su sitio nuevo (desde donde seguirá al cursor cuando vuelva).
+  if (!pointer) offset = { x: hole.x, y: hole.y };
   const goal = pointer ? { x: offset.x + (pointer.x - offset.x) * FOLLOW, y: offset.y + (pointer.y - offset.y) * FOLLOW } : offset;
   for (const axis of ['x', 'y']) {
     const target = Math.max(-ROAM, Math.min(ROAM, goal[axis]));
@@ -277,7 +279,7 @@ renderer.setAnimationLoop((now) => {
   zoom = pressed ? Math.min(ZOOM_MAX, zoom + ZOOM * dt) : zoom + (1 - zoom) * Math.min(1, dt / ZOOM_BACK);
   sun.object.scale.setScalar(zoom);
   sun.update(angle, light);
-  tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom);
+  tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight));
   // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
   // (de -1 a 1 hasta donde puede llegar) y lo que ha crecido.
   sound.update(pointerSpeed, pointerX);

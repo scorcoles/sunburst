@@ -24,6 +24,10 @@ import { HOLE } from './rays.js';
 // = las bandas un 10 % más anchas que con 26), y lo que avanzan hacia dentro por segundo
 // (en anillos).
 const RINGS = 23.6;
+// En pantallas pequeñas, menos anillos (más anchos): RINGS es para un recuadro con el lado
+// corto de REFERENCE píxeles o más; por debajo, en proporción, hasta FEWEST veces RINGS.
+const REFERENCE = 650;
+const FEWEST = 0.6;
 const FLOW = 0.35;
 // Lo fino que es el grano de las motas blancas (más = motas más pequeñas).
 const GRAIN = 150;
@@ -32,7 +36,7 @@ const GRAIN = 150;
 const STARS_DEPTH = 0.06;
 // La perspectiva del embudo: cuánto se va el centro del borde de fuera al lado contrario
 // del agujero (en proporción a lo que se aleja el agujero del centro) y cuánto sube (en
-// partes de medio recuadro).
+// partes de medio lado corto del recuadro).
 const LEAN = 0.5;
 const LIFT = 0.8;
 
@@ -44,6 +48,7 @@ export function createTunnel({ paper, ink }) {
     outerRadius: { value: 3 },
     phase: { value: 0 },
     zoom: { value: 1 },
+    rings: { value: RINGS },
     paper: { value: new THREE.Color(paper) },
     ink: { value: new THREE.Color(ink) },
   };
@@ -65,6 +70,7 @@ export function createTunnel({ paper, ink }) {
       uniform float outerRadius;
       uniform float phase;
       uniform float zoom;
+      uniform float rings;
       uniform vec3 paper;
       uniform vec3 ink;
       varying vec2 vWorld;
@@ -94,7 +100,7 @@ export function createTunnel({ paper, ink }) {
         // Las franjas: medio anillo negro, medio blanco, avanzando hacia dentro con
         // «phase». El borde, suavizado lo justo para que no salgan dientes (fwidth: cuánto
         // cambia de un píxel al de al lado).
-        float x = t * ${RINGS.toFixed(2)} + phase;
+        float x = t * rings + phase;
         float w = fwidth(x);
         float stripe = smoothstep(0.5 - w, 0.5 + w, abs(fract(x) - 0.5) * 2.0);
         float black = 1.0 - stripe;
@@ -132,17 +138,20 @@ export function createTunnel({ paper, ink }) {
   // el agujero se mueve.
   // «zoom»: cuánto se acerca todo, con el centro en el agujero (1 = nada): el agujero y el
   // borde de fuera crecen, y el centro de fuera se aleja del agujero, en esa proporción.
-  function update(dt, half, holeX, holeY, zoom = 1) {
+  // «shortSide»: el lado corto del recuadro, en píxeles (para cuántos anillos caben).
+  function update(dt, half, holeX, holeY, zoom = 1, shortSide = REFERENCE) {
     phase += FLOW * dt;
     // (Un poco más grande que el recuadro: al inclinarse, que no se vean sus bordes.)
     object.scale.set(half.width * 1.5, half.height * 1.5, 1);
     uniforms.hole.value.set(holeX, holeY);
     uniforms.holeRadius.value = HOLE * zoom;
     const outerX = -holeX * LEAN;
-    const outerY = -holeY * LEAN + half.height * LIFT;
+    // (La subida, con el lado corto: en una pantalla alta, con la altura, sería exagerada.)
+    const outerY = -holeY * LEAN + Math.min(half.width, half.height) * LIFT;
     uniforms.outer.value.set(holeX + (outerX - holeX) * zoom, holeY + (outerY - holeY) * zoom);
     uniforms.outerRadius.value = Math.hypot(half.width, half.height) * 1.6 * zoom;
     uniforms.zoom.value = zoom;
+    uniforms.rings.value = RINGS * Math.min(1, Math.max(FEWEST, shortSide / REFERENCE));
     uniforms.phase.value = phase;
   }
 
