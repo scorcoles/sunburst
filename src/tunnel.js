@@ -2,20 +2,27 @@
 // El modo túnel: anillos que caen hacia el agujero
 // =========================================================================================
 //
-// Anillos negros y blancos, uno dentro de otro, pero no concéntricos: cada uno tiene el
-// centro un poco más cerca del agujero que el anterior, y eso dibuja un embudo en
-// perspectiva, un túnel. Los anillos fluyen hacia dentro, como tragados. Encima, el
+// Anillos negros y blancos, uno dentro de otro, como en la portada de «Dead Flag
+// Contracts»: los de fuera, casi concéntricos y quietos; solo los más cercanos al agujero
+// se desplazan hacia él, cada vez más cuanto más cerca, y eso dibuja un embudo en
+// perspectiva, un túnel. Al mover el agujero, los anillos no lo siguen a la vez: cuanto
+// más lejos, más tarde (como si cada uno recordara dónde estaba el agujero un momento
+// antes), así que por delante del movimiento se apretujan y por detrás se abren, como el
+// efecto Doppler. Los anillos fluyen hacia dentro, como tragados. Encima, el
 // desgaste de una impresión vieja: motas blancas en el negro, fijas en el papel, que con
 // el zoom se quedan casi quietas, como un fondo estrellado a lo lejos.
 //
 // Todo lo pinta un shader sobre un rectángulo que llena el recuadro. Los anillos son una
-// familia de círculos: el de «t = 0» es el agujero y el de «t = 1» el borde de fuera; entre
-// medias, centro y radio van de uno a otro en línea recta:
-//     centro(t) = agujero + t · (fuera − agujero)      radio(t) = r₀ + t · (r₁ − r₀)
-// Para cada píxel p buscamos su t: el círculo que pasa justo por p. Es decir,
-// |p − centro(t)| = radio(t), que elevado al cuadrado es una ecuación de segundo grado en
-// t. Con t, el color sale solo: franjas alternas, tantas como RINGS entre el agujero y el
-// borde. Y t < 0 es dentro del agujero: negro.
+// familia de círculos: el de «t = 0» es el agujero y el de «t = 1» el borde de fuera. El
+// radio crece en línea recta, de uno a otro. El centro es el del borde de fuera, más un
+// tirón hacia el agujero que solo notan los de dentro:
+//     radio(t) = r₀ + t · (r₁ − r₀)
+//     centro(t) = fuera + (agujero(t) − fuera) · (1 − t / PULL_REACH)^1,2   (0 más allá)
+// donde agujero(t) es dónde estaba el agujero hace t · LAG segundos (el retraso). Para cada
+// píxel p buscamos su t: el círculo que pasa justo por p, |p − centro(t)| = radio(t). Ya no
+// es una ecuación que se resuelva de una vez: la buscamos partiendo el intervalo por la
+// mitad unas cuantas veces (bisección). Con t, el color sale solo: franjas alternas, tantas
+// como RINGS entre el agujero y el borde. Y dentro del agujero: negro.
 
 import * as THREE from 'three';
 import { HOLE } from './rays.js';
@@ -34,15 +41,24 @@ const GRAIN = 150;
 // Cuánto se acerca el grano con el zoom (0 = nada, quieto como estrellas al fondo; 1 = como
 // el túnel).
 const STARS_DEPTH = 0.06;
-// La perspectiva del embudo: cuánto se va el centro del borde de fuera al lado contrario
-// del agujero (en proporción a lo que se aleja el agujero del centro) y cuánto sube (en
-// partes de medio lado corto del recuadro).
-const LEAN = 0.5;
-const LIFT = 0.8;
+// El centro de los anillos de fuera: quieto, un poco por encima del centro del recuadro
+// (en partes de medio lado corto): así el agujero queda al fondo de un embudo visto desde
+// arriba.
+const LIFT = 1.3;
+// Hasta qué anillo llega el tirón del agujero (en partes del camino: 0,55 = los de dentro,
+// cada vez menos; los de fuera, quietos; si el agujero se aleja mucho, más, para que los
+// anillos no se crucen) y el retraso de los de fuera al mover el agujero (segundos
+// por cada camino entero: el efecto Doppler).
+const PULL_REACH = 0.55;
+const LAG = 1.4;
 
 export function createTunnel({ paper, ink }) {
   const uniforms = {
     hole: { value: new THREE.Vector2() },
+    // A qué velocidad se mueve el agujero (para el retraso de los anillos).
+    holeVelocity: { value: new THREE.Vector2() },
+    // Hasta qué anillo llega el tirón (lo calcula «update»).
+    pullReach: { value: PULL_REACH },
     holeRadius: { value: 0.25 },
     outer: { value: new THREE.Vector2() },
     outerRadius: { value: 3 },
@@ -65,6 +81,8 @@ export function createTunnel({ paper, ink }) {
     `,
     fragmentShader: /* glsl */ `
       uniform vec2 hole;
+      uniform vec2 holeVelocity;
+      uniform float pullReach;
       uniform float holeRadius;
       uniform vec2 outer;
       uniform float outerRadius;
@@ -85,17 +103,31 @@ export function createTunnel({ paper, ink }) {
                    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
       }
 
+      // El centro del anillo t: el de fuera, más el tirón hacia el agujero (dónde estaba hace
+      // t · LAG segundos), que solo notan los de dentro.
+      vec2 centerOf(float t) {
+        float pull = pow(max(1.0 - t / pullReach, 0.0), 1.2);
+        vec2 then = hole - holeVelocity * t * ${LAG.toFixed(2)};
+        return outer + (then - outer) * pull;
+      }
+
+      // Lo lejos que está este píxel del anillo t: positivo, fuera de él; negativo, dentro.
+      float ringGap(float t) {
+        return length(vWorld - centerOf(t)) - (holeRadius + t * (outerRadius - holeRadius));
+      }
+
       void main() {
-        // Su t: la ecuación A·t² + B·t + C = 0 (ver arriba). Como los anillos de fuera
-        // crecen más deprisa de lo que se mueve su centro, A es negativo y hay una raíz
-        // positiva (fuera del agujero) y otra negativa: nos quedamos con la buena.
-        vec2 b = outer - hole;
-        float dr = outerRadius - holeRadius;
-        vec2 q = vWorld - hole;
-        float A = dot(b, b) - dr * dr;
-        float B = -2.0 * (dot(q, b) + holeRadius * dr);
-        float C = dot(q, q) - holeRadius * holeRadius;
-        float t = (-B - sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A);
+        // Su t, por bisección: f(t) = |p − centro(t)| − radio(t) es positivo en el agujero
+        // (t = 0, si el píxel está fuera de él) y negativo lejos; buscamos dónde se hace 0.
+        float lo = 0.0;
+        float hi = 1.3;
+        for (int i = 0; i < 20; i++) {
+          float mid = 0.5 * (lo + hi);
+          if (ringGap(mid) > 0.0) lo = mid; else hi = mid;
+        }
+        float t = 0.5 * (lo + hi);
+        // C < 0: dentro del agujero.
+        float C = ringGap(0.0);
 
         // Las franjas: medio anillo negro, medio blanco, avanzando hacia dentro con
         // «phase». El borde, suavizado lo justo para que no salgan dientes (fwidth: cuánto
@@ -139,16 +171,26 @@ export function createTunnel({ paper, ink }) {
   // «zoom»: cuánto se acerca todo, con el centro en el agujero (1 = nada): el agujero y el
   // borde de fuera crecen, y el centro de fuera se aleja del agujero, en esa proporción.
   // «shortSide»: el lado corto del recuadro, en píxeles (para cuántos anillos caben).
-  function update(dt, half, holeX, holeY, zoom = 1, shortSide = REFERENCE) {
+  // «velocityX, velocityY»: a qué velocidad se mueve el agujero (para el retraso).
+  function update(dt, half, holeX, holeY, zoom = 1, shortSide = REFERENCE, velocityX = 0, velocityY = 0) {
     phase += FLOW * dt;
     // (Un poco más grande que el recuadro: al inclinarse, que no se vean sus bordes.)
     object.scale.set(half.width * 1.5, half.height * 1.5, 1);
     uniforms.hole.value.set(holeX, holeY);
+    uniforms.holeVelocity.value.set(velocityX, velocityY);
     uniforms.holeRadius.value = HOLE * zoom;
-    const outerX = -holeX * LEAN;
-    // (La subida, con el lado corto: en una pantalla alta, con la altura, sería exagerada.)
-    const outerY = -holeY * LEAN + Math.min(half.width, half.height) * LIFT;
+    // El centro de fuera, quieto (con el zoom, se aleja del agujero en esa proporción). La
+    // subida, con el lado corto: en una pantalla alta, con la altura, sería exagerada.
+    const outerX = 0;
+    const outerY = Math.min(half.width, half.height) * LIFT;
     uniforms.outer.value.set(holeX + (outerX - holeX) * zoom, holeY + (outerY - holeY) * zoom);
+    // Que los anillos no se crucen: el centro no puede moverse de un anillo al siguiente más
+    // de lo que crece su radio. Junto al agujero, el centro cambia 1,2 · d / alcance por
+    // cada t (d: lo lejos que está el agujero del centro de fuera, contando el retraso), y
+    // el radio, r₁ − r₀. Si el agujero está muy lejos, el tirón llega más lejos (más suave).
+    const reachOut = Math.hypot(half.width, half.height) * 1.6 - HOLE;
+    const away = Math.hypot(outerX - holeX, outerY - holeY) + Math.hypot(velocityX, velocityY) * LAG;
+    uniforms.pullReach.value = Math.max(PULL_REACH, (1.2 * away) / (0.85 * reachOut));
     uniforms.outerRadius.value = Math.hypot(half.width, half.height) * 1.6 * zoom;
     uniforms.zoom.value = zoom;
     uniforms.rings.value = RINGS * Math.min(1, Math.max(FEWEST, shortSide / REFERENCE));

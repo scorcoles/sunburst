@@ -73,6 +73,8 @@ const ZOOM_BACK = 0.35;
 // Al soltar, el zoom espera un momento antes de volver (segundos): da tiempo a llegar al
 // botón de compartir. Y con el ratón encima de los botones de arriba, no vuelve.
 const ZOOM_HOLD = 1.5;
+// Cuánto más deprisa giran los rayos con el zoom (por cada vez que se acerca).
+const ZOOM_SPIN = 1.2;
 
 
 // La luz: hacia dónde está (radianes), cuánto la mueve el ratón (de un lado al otro del
@@ -275,7 +277,9 @@ renderer.setAnimationLoop((now) => {
   const dt = Math.min((now - last) / 1000, 1 / 20);
   last = now;
   time += dt;
-  angle += spinAt(time) * dt;
+  // Con el zoom, los rayos giran más deprisa (como si cayeras hacia el centro de un
+  // remolino): a ZOOM_SPIN veces más por cada vez que se acerca.
+  angle += spinAt(time) * dt * (1 + (zoom - 1) * ZOOM_SPIN);
   light += (LIGHT - pointerX * LIGHT_REACH - light) * Math.min(1, dt / LIGHT_EASE);
   // El agujero: el muelle tira de él hacia su objetivo (un trozo del camino hacia el
   // cursor) y el rozamiento lo frena. Sin cursor, nada tira de él: frena y se queda donde
@@ -306,7 +310,7 @@ renderer.setAnimationLoop((now) => {
   else if (!holding) zoom += (1 - zoom) * Math.min(1, dt / ZOOM_BACK);
   sun.object.scale.setScalar(zoom);
   sun.update(angle, light);
-  tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight));
+  tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom, Math.min(canvas.clientWidth, canvas.clientHeight), hole.vx * half.width, hole.vy * half.height);
   // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
   // (de -1 a 1 hasta donde puede llegar) y lo que ha crecido.
   sound.update(pointerSpeed, pointerX);
