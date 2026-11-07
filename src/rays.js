@@ -260,11 +260,6 @@ export function createRays({ background }) {
     });
   }
 
-  // El tamaño del agujero (1 = el de siempre): crece mientras se mantiene pulsado.
-  function setHoleSize(size) {
-    hole.scale.setScalar(size);
-  }
-
   // El modo: «folds» (cada tramo, una faceta), «flat» (una sola lámina) o «wire» (el
   // contorno y las guías, sobre el papel).
   function setLook(look) {
@@ -276,5 +271,5 @@ export function createRays({ background }) {
     hole.material.color.set(wire ? WIRE_PAPER : background);
   }
 
-  return { object, update, setLook, setHoleSize, dispose };
+  return { object, update, setLook, dispose };
 }

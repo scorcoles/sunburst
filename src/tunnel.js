@@ -17,6 +17,7 @@
 // borde. Y t < 0 es dentro del agujero: negro.
 
 import * as THREE from 'three';
+import { HOLE } from './rays.js';
 
 // Cuántos anillos hay del agujero al borde de fuera (no hace falta que sea entero: 23,6
 // = las bandas un 10 % más anchas que con 26), y lo que avanzan hacia dentro por segundo
@@ -38,6 +39,7 @@ export function createTunnel({ paper, ink }) {
     outer: { value: new THREE.Vector2() },
     outerRadius: { value: 3 },
     phase: { value: 0 },
+    zoom: { value: 1 },
     paper: { value: new THREE.Color(paper) },
     ink: { value: new THREE.Color(ink) },
   };
@@ -58,6 +60,7 @@ export function createTunnel({ paper, ink }) {
       uniform vec2 outer;
       uniform float outerRadius;
       uniform float phase;
+      uniform float zoom;
       uniform vec3 paper;
       uniform vec3 ink;
       varying vec2 vWorld;
@@ -97,7 +100,8 @@ export function createTunnel({ paper, ink }) {
         // El desgaste, fijo en el papel: solo en el negro, motas blancas, como tinta que no
         // ha llegado a agarrar. El blanco queda limpio. (Y fuera del agujero: dentro, negro
         // limpio.)
-        vec2 uv = vWorld;
+        // (Con el zoom, el grano también se acerca: va pegado al dibujo.)
+        vec2 uv = hole + (vWorld - hole) / zoom;
         // (GRAIN: lo fino que es el grano; más = motas más pequeñas.)
         float specks = step(0.88, noise(uv * ${GRAIN.toFixed(1)} + 11.0)) * step(0.66, noise(uv * 3.5 + 7.0));
         float outside = step(0.0, C);
@@ -121,14 +125,19 @@ export function createTunnel({ paper, ink }) {
   // esquinas, con el centro por encima del agujero y hacia el lado contrario: así el
   // agujero queda al fondo de un embudo que se ve desde arriba, y el túnel se dobla cuando
   // el agujero se mueve.
-  function update(dt, half, holeX, holeY, holeRadius) {
+  // «zoom»: cuánto se acerca todo, con el centro en el agujero (1 = nada): el agujero y el
+  // borde de fuera crecen, y el centro de fuera se aleja del agujero, en esa proporción.
+  function update(dt, half, holeX, holeY, zoom = 1) {
     phase += FLOW * dt;
     // (Un poco más grande que el recuadro: al inclinarse, que no se vean sus bordes.)
     object.scale.set(half.width * 1.5, half.height * 1.5, 1);
     uniforms.hole.value.set(holeX, holeY);
-    uniforms.holeRadius.value = holeRadius;
-    uniforms.outer.value.set(-holeX * LEAN, -holeY * LEAN + half.height * LIFT);
-    uniforms.outerRadius.value = Math.hypot(half.width, half.height) * 1.6;
+    uniforms.holeRadius.value = HOLE * zoom;
+    const outerX = -holeX * LEAN;
+    const outerY = -holeY * LEAN + half.height * LIFT;
+    uniforms.outer.value.set(holeX + (outerX - holeX) * zoom, holeY + (outerY - holeY) * zoom);
+    uniforms.outerRadius.value = Math.hypot(half.width, half.height) * 1.6 * zoom;
+    uniforms.zoom.value = zoom;
     uniforms.phase.value = phase;
   }
 

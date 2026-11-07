@@ -18,7 +18,7 @@
 //   - al mover el cursor deprisa, un SOPLO: ruido por un filtro que sube y baja, en el
 //     altavoz del lado del cursor;
 //   - el AGUJERO manda en el tono: subirlo o bajarlo sube o baja todo (hasta 3 semitonos),
-//     llevarlo a un lado o al otro lo hace más brillante o más apagado; y al crecer
+//     llevarlo a un lado o al otro lo hace más brillante o más apagado; y con el zoom
 //     (manteniendo pulsado), todo baja y se cierra, como tragado.
 //
 // Los navegadores no dejan sonar nada sin que se toque algo: empieza con el botón de arriba.
@@ -43,7 +43,7 @@ const SHIMMER = 0.035;
 const BANDS = 28;
 
 // Lo que cambia con el agujero (de -1 a 1 en cada eje): el tono, hasta PLACE_PITCH
-// céntimos arriba o abajo; el filtro, hasta PLACE_FILTER octavas. Y al crecer: por cada
+// céntimos arriba o abajo; el filtro, hasta PLACE_FILTER octavas. Y con el zoom: por cada
 // vez su tamaño, el tono baja GROW_PITCH céntimos y el filtro se cierra en proporción.
 const PLACE_PITCH = 300;
 const PLACE_FILTER = 1;

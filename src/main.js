@@ -21,12 +21,12 @@
 //
 // El agujero cae en un sitio al azar del recuadro y sigue al cursor, pero con pereza: tarda
 // en arrancar, no llega del todo y, si el cursor se va, vuelve a su sitio. Con el ratón
-// pulsado o el dedo puesto, crece (se traga los rayos); al soltar, vuelve a su tamaño. Con doble clic o
-// doble toque, sale un sol nuevo (otro sitio, otros destellos). Mover el ratón o el dedo
-// también mueve la luz.
+// pulsado o el dedo puesto, todo se acerca: un zoom con el centro en el agujero; al soltar,
+// vuelve. Con doble clic o doble toque, sale un sol nuevo (otro sitio, otros destellos).
+// Mover el ratón o el dedo también mueve la luz.
 
 import * as THREE from 'three';
-import { createRays, HOLE, INFO, WIRE_PAPER } from './rays.js';
+import { createRays, INFO, WIRE_PAPER } from './rays.js';
 import { createTunnel } from './tunnel.js';
 import { createSound } from './sound.js';
 import { setupShare } from './share.js';
@@ -61,11 +61,12 @@ const ROAM = 0.85;
 const LEAN = 0.35;
 const LEAN_MAX = 0.4;
 
-// El agujero que crece: cuánto por segundo mientras se mantiene pulsado (1 = su tamaño
-// cada segundo), hasta cuánto (veces su tamaño) y lo que tarda en volver al soltar (s).
-const GROW = 0.9;
-const GROW_MAX = 5;
-const SHRINK = 0.35;
+// El zoom al mantener pulsado, con el centro en el agujero: cuánto se acerca por segundo
+// (1 = el tamaño de siempre cada segundo), hasta cuánto (veces) y lo que tarda en volver
+// al soltar (segundos).
+const ZOOM = 0.9;
+const ZOOM_MAX = 5;
+const ZOOM_BACK = 0.35;
 
 // La luz: hacia dónde está (radianes), cuánto la mueve el ratón (de un lado al otro del
 // recuadro) y lo que tarda en seguirlo (segundos).
@@ -182,7 +183,7 @@ canvas.addEventListener('pointerleave', () => {
   pointer = null;
 });
 
-// Mientras se mantiene pulsado (el ratón o el dedo, dentro del recuadro), el agujero crece.
+// Mientras se mantiene pulsado (el ratón o el dedo, dentro del recuadro), todo se acerca.
 let pressed = false;
 canvas.addEventListener('pointerdown', (e) => {
   if (e.isPrimary) pressed = true;
@@ -192,7 +193,7 @@ for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
     pressed = false;
   });
 }
-let holeSize = 1;
+let zoom = 1;
 
 // Doble clic o doble toque: un sol nuevo. Lo detectamos a mano (dos toques en menos de
 // 300 ms y a menos de 30 px): en el móvil, el «dblclick» del navegador no llega siempre.
@@ -270,15 +271,17 @@ renderer.setAnimationLoop((now) => {
   const clampLean = (v) => Math.max(-LEAN_MAX, Math.min(LEAN_MAX, v));
   sun.object.rotation.set(clampLean(-hole.vy * LEAN), clampLean(hole.vx * LEAN), 0);
   tunnel.object.rotation.copy(sun.object.rotation);
-  // Pulsado, crece a ritmo constante; suelto, vuelve a su tamaño, deprisa al principio.
-  holeSize = pressed ? Math.min(GROW_MAX, holeSize + GROW * dt) : holeSize + (1 - holeSize) * Math.min(1, dt / SHRINK);
-  sun.setHoleSize(holeSize);
+  // El zoom: pulsado, se acerca a ritmo constante; suelto, vuelve, deprisa al principio.
+  // Los rayos (con su agujero y las guías del wire) se agrandan desde el agujero, que es
+  // donde está su centro.
+  zoom = pressed ? Math.min(ZOOM_MAX, zoom + ZOOM * dt) : zoom + (1 - zoom) * Math.min(1, dt / ZOOM_BACK);
+  sun.object.scale.setScalar(zoom);
   sun.update(angle, light);
-  tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, HOLE * holeSize);
+  tunnel.update(dt, half, sun.object.position.x, sun.object.position.y, zoom);
   // El sonido: el scratch si el cursor va deprisa, y el grave según dónde está el agujero
   // (de -1 a 1 hasta donde puede llegar) y lo que ha crecido.
   sound.update(pointerSpeed, pointerX);
   pointerSpeed *= Math.exp(-dt * 10);
-  sound.setShape(hole.x / ROAM, hole.y / ROAM, holeSize, angle);
+  sound.setShape(hole.x / ROAM, hole.y / ROAM, zoom, angle);
   renderer.render(scene, camera);
 });
