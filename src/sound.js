@@ -90,7 +90,17 @@ export function createSound() {
     master = ctx.createGain();
     master.gain.value = 0;
     const compressor = ctx.createDynamicsCompressor();
-    master.connect(compressor).connect(ctx.destination);
+    // Sin el foco de la ventana (otra pestaña, otra aplicación) se calla; al volver, suena.
+    const focus = ctx.createGain();
+    focus.gain.value = document.hasFocus() ? 1 : 0;
+    master.connect(compressor).connect(focus).connect(ctx.destination);
+    const followFocus = () => {
+      const on = document.hasFocus() && !document.hidden;
+      focus.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, 0.12);
+    };
+    addEventListener('blur', followFocus);
+    addEventListener('focus', followFocus);
+    document.addEventListener('visibilitychange', followFocus);
     bed = ctx.createGain();
     bed.connect(master);
 
